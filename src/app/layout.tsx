@@ -6,11 +6,12 @@ import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { Providers } from '@/components/providers';
 
-
-const geistSans = GeistSans({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
+// Removed incorrect GeistSans function call:
+// const geistSans = GeistSans({
+//   variable: '--font-geist-sans',
+//   subsets: ['latin'],
+// });
+// GeistSans is an object, and we will use GeistSans.variable directly.
 
 export const metadata: Metadata = {
   title: 'Local Pulse - Discover & Rate Local Events',
@@ -26,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} antialiased`}>
+    <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+      <body className={`antialiased`}> {/* Use GeistSans.variable on <html> or <body> to define the CSS var */}
         <Providers>
           <div className="relative flex min-h-screen flex-col">
             <SiteHeader />
