@@ -1,23 +1,64 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Event, EventCategory, DateRangeFilter } from '@/types/event';
+import type { Event, EventCategory, DateRangeFilter, KarnatakaDistrict, KarnatakaCity } from '@/types/event';
 import { EventFilters } from './event-filters';
 import { EventList } from './event-list';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentLocation, type Location } from '@/services/geolocation';
 import { Loader2, MapPinOff, RefreshCw } from 'lucide-react';
-import { calculateDistance } from '@/lib/utils'; // Assuming utils.ts will have this
+import { calculateDistance } from '@/lib/utils';
+import { KARNATAKA_DISTRICTS, EVENT_CATEGORIES as APP_EVENT_CATEGORIES } from '@/types/event';
 
 // Mock event data - replace with actual API calls
-const MOCK_EVENTS: Event[] = [
-  { id: '1', name: 'Summer Music Fest', description: 'An amazing outdoor music festival with local bands.', date: '2024-08-15', time: '02:00 PM', locationName: 'Central Park', address: '123 Park Ave, Cityville', latitude: 34.0522, longitude: -118.2437, category: 'Music', imageUrl: 'https://picsum.photos/seed/music/600/400', createdAt: '2024-01-01', averageRating: 4.5, ratings: [{id: 'r1', userId: 'u1', eventId: '1', rating: 5, reviewText: 'Awesome!', createdAt: '2024-01-01', updatedAt: '2024-01-01'}] },
-  { id: '2', name: 'Tech Workshop', description: 'Learn the latest in web development.', date: '2024-07-20', time: '10:00 AM', locationName: 'Community Center', address: '456 Main St, Cityville', latitude: 34.0580, longitude: -118.2500, category: 'Workshop', imageUrl: 'https://picsum.photos/seed/tech/600/400', createdAt: '2024-01-01', averageRating: 4.2, ratings: [] },
-  { id: '3', name: 'Art Expo', description: 'Exhibition of modern art.', date: '2024-09-01', time: '11:00 AM', locationName: 'City Art Gallery', address: '789 Gallery Rd, Cityville', latitude: 34.0400, longitude: -118.2300, category: 'Arts', imageUrl: 'https://picsum.photos/seed/art/600/400', createdAt: '2024-01-01', averageRating: 3.8, ratings: [] },
-  { id: '4', name: 'Food Truck Rally', description: 'A variety of delicious food trucks.', date: '2024-07-25', time: '05:00 PM', locationName: 'Downtown Square', address: '101 Square Pl, Cityville', latitude: 34.0550, longitude: -118.2450, category: 'Food', imageUrl: 'https://picsum.photos/seed/food/600/400', createdAt: '2024-01-01', averageRating: 4.8, ratings: [] },
-  { id: '5', name: 'Charity Run 5K', description: 'Run for a cause!', date: '2024-08-03', time: '08:00 AM', locationName: 'Riverfront Park', address: '202 River Rd, Cityville', latitude: 34.0600, longitude: -118.2550, category: 'Sport', createdAt: '2024-01-01', averageRating: 4.0, ratings: [] },
-  { id: '6', name: 'Farmers Market', description: 'Fresh local produce and goods.', date: '2024-07-27', time: '09:00 AM', locationName: 'Old Town Square', address: '303 Market St, Cityville', latitude: 34.0450, longitude: -118.2350, category: 'Community', imageUrl: 'https://picsum.photos/seed/market/600/400', createdAt: '2024-01-01' },
+// Updated to include Karnataka-specific fields
+const MOCK_EVENTS_KARNATAKA: Event[] = [
+  { 
+    id: '1', name: 'Kala Utsava Bengaluru', nameKa: 'ಕಲಾ ಉತ್ಸವ ಬೆಂಗಳೂರು', 
+    description: 'A grand celebration of Karnataka\'s art and culture in the heart of Bengaluru.', 
+    date: '2024-09-15', time: '10:00 AM', 
+    locationName: 'Vidhana Soudha Grounds', address: 'Ambedkar Veedhi, Sampangi Rama Nagara, Bengaluru, Karnataka 560001', 
+    district: 'Bengaluru Urban', city: 'Bengaluru', latitude: 12.9797, longitude: 77.5913, 
+    category: 'Utsava', language: 'Bilingual', culturalRelevance: ['Rajyotsava'],
+    imageUrl: 'https://picsum.photos/seed/utsava/600/400', 
+    posterKaUrl: 'https://picsum.photos/seed/utsavaKA/600/400',
+    createdAt: '2024-02-01', averageRating: 4.7, price: 0,
+    ratings: [{id: 'r1', userId: 'u1', eventId: '1', rating: 5, reviewText: 'Amazing Utsava!', createdAt: '2024-09-16', updatedAt: '2024-09-16', user: {id: 'u1', username: 'CultureVulture'}}],
+    targetDistricts: ['Bengaluru Urban', 'Bengaluru Rural', 'Ramanagara']
+  },
+  { 
+    id: '2', name: 'Mysuru Dasara Tech Hackathon', nameKa: 'ಮೈಸೂರು ದಸರಾ ಟೆಕ್ ಹ್ಯಾಕಥಾನ್',
+    description: 'Innovate and build during the vibrant Mysuru Dasara festivities. Themes related to local challenges.', 
+    date: '2024-10-05', time: '09:00 AM', endDate: '2024-10-06', endTime: '06:00 PM',
+    locationName: 'JSS Science and Technology University', address: 'SJCE Campus, Mysuru, Karnataka 570006', 
+    district: 'Mysuru (Mysore)', city: 'Mysuru', latitude: 12.314, longitude: 76.612, 
+    category: 'Hackathons', language: 'English',
+    imageUrl: 'https://picsum.photos/seed/hackathon/600/400', 
+    createdAt: '2024-03-01', averageRating: 4.9, price: 100, registrationUrl: '#',
+    ratings: [] 
+  },
+  { 
+    id: '3', name: 'Yakshagana Sammelana Udupi', nameKa: 'ಯಕ್ಷಗಾನ ಸಮ್ಮೇಳನ ಉಡುಪಿ',
+    description: 'A grand gathering of Yakshagana artists and enthusiasts in Udupi.', 
+    date: '2024-11-20', time: '06:00 PM', 
+    locationName: 'Sri Krishna Mutt Complex', address: 'Temple Car St, Sri Krishna Temple Complex, Thenkpete, Maruthi Veethika, Udupi, Karnataka 576101', 
+    district: 'Udupi', city: 'Udupi', latitude: 13.342, longitude: 74.747, 
+    category: 'Yakshagana', language: 'Kannada', culturalRelevance: ['Other Festival'],
+    imageUrl: 'https://picsum.photos/seed/yakshagana/600/400', 
+    createdAt: '2024-04-01', averageRating: 4.5, price: 50, 
+    ratings: [] 
+  },
+   { 
+    id: '4', name: 'Hubballi Startup Meet', nameKa: 'ಹುಬ್ಬಳ್ಳಿ ಸ್ಟಾರ್ಟ್‌ಅಪ್ ಮೀಟ್',
+    description: 'Networking event for entrepreneurs and investors in North Karnataka.', 
+    date: '2024-08-30', time: '02:00 PM', 
+    locationName: 'Deshpande Foundation', address: 'Plot No. 1, Technology Avenue, Hubballi, Karnataka 580029', 
+    district: 'Dharwad', city: 'Hubballi', latitude: 15.3647, longitude: 75.1239, 
+    category: 'Startup Meets', language: 'English',
+    imageUrl: 'https://picsum.photos/seed/startupmeet/600/400', 
+    createdAt: '2024-05-01', ratings: [], averageRating: 4.2, price: 250
+  },
 ];
 
 
@@ -32,6 +73,9 @@ export function EventDiscovery() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<EventCategory[]>([]);
   const [selectedDateRange, setSelectedDateRange] = useState<DateRangeFilter>('All');
+  const [selectedDistrict, setSelectedDistrict] = useState<KarnatakaDistrict | 'All'>('All');
+  // Taluk/City filtering can be added similarly if data becomes available.
+  // For now, district is the primary geographic filter.
 
   const { toast } = useToast();
 
@@ -39,21 +83,23 @@ export function EventDiscovery() {
     setIsLoadingLocation(true);
     setLocationError(null);
     try {
-      const location = await getCurrentLocation();
+      const location = await getCurrentLocation(); // This is currently mocked to return a fixed location
       if (location) {
         setUserLocation(location);
-        toast({ title: 'Location Found!', description: `Showing events near your location.` });
+        // toast({ title: 'Location Found!', description: `Showing events near your location.` });
       } else {
-        setLocationError('Could not determine your location. Please enable location services or enter a location manually.');
-        toast({ title: 'Location Error', description: 'Could not determine your location.', variant: 'destructive' });
+        // For Karnataka app, if location fails, we can default to a central Karnataka city or show all.
+        // Here, we'll just note the error and proceed without location-based sorting.
+        setLocationError('Could not determine your location. Events will not be sorted by proximity.');
+        // toast({ title: 'Location Optional', description: 'Could not determine your location. Displaying all Karnataka events.', variant: 'default' });
       }
     } catch (error) {
-      setLocationError('Error getting location. Please try again or enter a location manually.');
-      toast({ title: 'Location Error', description: (error as Error).message, variant: 'destructive' });
+      setLocationError('Error getting location. Events will not be sorted by proximity.');
+      // toast({ title: 'Location Error', description: (error as Error).message, variant: 'default' });
     } finally {
       setIsLoadingLocation(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchUserLocation();
@@ -62,17 +108,19 @@ export function EventDiscovery() {
   // Simulate fetching events (replace with actual API call)
   useEffect(() => {
     setIsLoadingEvents(true);
-    // Simulate API delay
     setTimeout(() => {
-      let eventsWithDistance = MOCK_EVENTS;
+      let eventsWithDistance = MOCK_EVENTS_KARNATAKA;
       if (userLocation) {
-        eventsWithDistance = MOCK_EVENTS.map(event => ({
+        eventsWithDistance = MOCK_EVENTS_KARNATAKA.map(event => ({
           ...event,
           distance: calculateDistance(userLocation.lat, userLocation.lng, event.latitude, event.longitude)
         })).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      } else {
+         // If no user location, sort by date or name as a fallback
+        eventsWithDistance = MOCK_EVENTS_KARNATAKA.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       }
       setAllEvents(eventsWithDistance);
-      setFilteredEvents(eventsWithDistance);
+      setFilteredEvents(eventsWithDistance); // Initially show all (or sorted by proximity if location available)
       setIsLoadingEvents(false);
     }, 1000);
   }, [userLocation]);
@@ -81,12 +129,16 @@ export function EventDiscovery() {
   useEffect(() => {
     let events = [...allEvents];
 
-    // Filter by search term
+    // Filter by search term (name, description, locationName, category in Kannada or English)
     if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       events = events.filter(event =>
-        event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.category.toLowerCase().includes(searchTerm.toLowerCase())
+        event.name.toLowerCase().includes(lowerSearchTerm) ||
+        (event.nameKa && event.nameKa.toLowerCase().includes(lowerSearchTerm)) ||
+        event.description.toLowerCase().includes(lowerSearchTerm) ||
+        (event.descriptionKa && event.descriptionKa.toLowerCase().includes(lowerSearchTerm)) ||
+        event.locationName.toLowerCase().includes(lowerSearchTerm) ||
+        event.category.toLowerCase().includes(lowerSearchTerm)
       );
     }
 
@@ -95,10 +147,15 @@ export function EventDiscovery() {
       events = events.filter(event => selectedCategories.includes(event.category as EventCategory));
     }
     
+    // Filter by district
+    if (selectedDistrict !== 'All') {
+        events = events.filter(event => event.district === selectedDistrict);
+    }
+
     // Filter by date range
     if (selectedDateRange !== 'All') {
         const today = new Date();
-        today.setHours(0,0,0,0); // Start of today
+        today.setHours(0,0,0,0); 
 
         events = events.filter(event => {
             const eventDate = new Date(event.date);
@@ -106,9 +163,9 @@ export function EventDiscovery() {
                 return eventDate.toDateString() === today.toDateString();
             }
             if (selectedDateRange === "This Weekend") {
-                const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+                const dayOfWeek = today.getDay(); 
                 const endOfWeek = new Date(today);
-                endOfWeek.setDate(today.getDate() + (6 - dayOfWeek) + 1); // End of Sunday
+                endOfWeek.setDate(today.getDate() + (6 - dayOfWeek) + 1); 
                 endOfWeek.setHours(23,59,59,999);
                 return eventDate >= today && eventDate <= endOfWeek;
             }
@@ -122,38 +179,43 @@ export function EventDiscovery() {
         });
     }
 
+    // If userLocation is available, re-sort by distance after filtering
+    // otherwise, ensure consistent sort order (e.g., by date)
+    if (userLocation) {
+        events.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+    } else {
+        events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
 
     setFilteredEvents(events);
-  }, [searchTerm, selectedCategories, selectedDateRange, allEvents]);
+  }, [searchTerm, selectedCategories, selectedDateRange, selectedDistrict, allEvents, userLocation]);
 
 
-  if (isLoadingLocation) {
+  if (isLoadingLocation && isLoadingEvents) { // Show loader if both are loading initially
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Getting your location...</p>
+        <p className="text-lg text-muted-foreground">Finding events in Karnataka...</p>
       </div>
     );
   }
 
-  if (locationError && !userLocation) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
-        <MapPinOff className="h-16 w-16 text-destructive mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Location Access Denied</h2>
-        <p className="text-muted-foreground mb-4 max-w-md">{locationError}</p>
-        <Button onClick={fetchUserLocation}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-        </Button>
-        {/* TODO: Add manual location input */}
-      </div>
-    );
+  if (locationError && !userLocation && !isLoadingLocation) { // Display location error if persistent and not loading
+     // User can still use the app, location sorting is just off
+     toast({
+        title: 'Location Unavailable',
+        description: `${locationError} You can still browse all events.`,
+        variant: 'default',
+        duration: 5000,
+     });
   }
-
+  
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2 tracking-tight">Discover Local Events</h1>
-      <p className="text-muted-foreground mb-6">Find exciting events happening near you.</p>
+      <div className="mb-6 text-center md:text-left">
+        <h1 className="text-3xl md:text-4xl font-bold mb-1 tracking-tight text-primary">ಸ್ಥಳೀಯ ಕಾರ್ಯಕ್ರಮಗಳು</h1>
+        <p className="text-muted-foreground md:text-lg">Discover exciting events happening across Karnataka.</p>
+      </div>
       
       <EventFilters
         searchTerm={searchTerm}
@@ -162,10 +224,16 @@ export function EventDiscovery() {
         setSelectedCategories={setSelectedCategories}
         selectedDateRange={selectedDateRange}
         setSelectedDateRange={setSelectedDateRange}
+        availableDistricts={KARNATAKA_DISTRICTS}
+        selectedDistrict={selectedDistrict}
+        setSelectedDistrict={setSelectedDistrict}
+        availableCategories={APP_EVENT_CATEGORIES}
       />
       
-      <EventList events={filteredEvents} isLoading={isLoadingEvents} />
+      <EventList events={filteredEvents} isLoading={isLoadingEvents || (isLoadingLocation && !userLocation)} />
       {/* TODO: Add pagination or infinite scroll */}
+      {/* TODO: Push notification subscription UI element? (Later stage) */}
+      {/* TODO: WatchList UI integration (Later stage) */}
     </div>
   );
 }
