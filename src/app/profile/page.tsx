@@ -13,7 +13,7 @@ import { KARNATAKA_DISTRICTS, KARNATAKA_CITIES, LANGUAGE_PREFERENCES, USER_INTER
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 // Mock current user data - replace with actual fetch from auth context/API
-const MOCK_USER_DATA: User = {
+let MOCK_USER_DATA: User = {
   id: 'devUser123',
   name: 'Ananya Kulkarni',
   username: 'AnanyaK',
