@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { ThemeProvider } from '@/components/providers';
-import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
+// import { AuthProvider } from '@/contexts/authContext'; // ClerkProvider will handle auth
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
 import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
@@ -47,8 +47,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [ 
-    { media: '(prefers-color-scheme: light)', color: 'hsl(var(--background))' }, 
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'hsl(var(--background))' },
     { media: '(prefers-color-scheme: dark)', color: 'hsl(var(--background))' },
   ],
   width: "device-width",
@@ -68,15 +68,15 @@ export default function RootLayout({
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       appearance={{
         variables: {
-          colorPrimary: 'hsl(var(--primary))', 
+          colorPrimary: 'hsl(var(--primary))',
           colorText: 'hsl(var(--foreground))',
           colorBackground: 'hsl(var(--background))',
           colorInputBackground: 'hsl(var(--input))',
           colorInputText: 'hsl(var(--foreground))',
-          borderRadius: '0.75rem', 
+          borderRadius: '0.75rem',
         },
         elements: {
-          card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md glassmorphism', 
+          card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md glassmorphism',
           formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg py-2.5 text-base transition-transform hover:scale-105 active:scale-95 shadow-md',
           socialButtonsBlockButton: 'rounded-lg border-border/50',
           footerActionLink: 'text-primary hover:text-primary/90',
@@ -94,23 +94,22 @@ export default function RootLayout({
           <meta name="format-detection" content="telephone=no" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="msapplication-config" content="/icons/browserconfig.xml" />
-          <meta name="msapplication-TileColor" content="#007AFF" /> 
+          <meta name="msapplication-TileColor" content="#007AFF" />
           <meta name="msapplication-tap-highlight" content="no" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
-          <AuthProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-              <div className="relative flex min-h-screen flex-col">
-                <SiteHeader />
-                <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6">
-                  {children}
-                </main>
-                <SiteFooter />
-                <BottomNavigationBar />
-              </div>
-              <Toaster />
-            </ThemeProvider>
-          </AuthProvider>
+          {/* AuthProvider is removed as ClerkProvider handles authentication state */}
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <div className="relative flex min-h-screen flex-col">
+              <SiteHeader />
+              <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6">
+                {children}
+              </main>
+              <SiteFooter />
+              <BottomNavigationBar />
+            </div>
+            <Toaster />
+          </ThemeProvider>
           <SpeedInsightsWrapper />
         </body>
       </html>
