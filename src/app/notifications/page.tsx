@@ -9,7 +9,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import type { WatchListNotification } from '@/types/event';
-import { useAuth } from '@/contexts/authContext'; // Using Firebase Auth
+// import { useAuth } from '@/contexts/authContext'; // Removed, use Clerk
+import { useUser as useClerkUser } from '@clerk/nextjs'; // Added Clerk's useUser
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
@@ -69,7 +70,8 @@ async function deleteNotificationFromFirestore(notificationId: string, userId: s
 
 
 export default function NotificationsPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  // const { currentUser, loading: authLoading } = useAuth(); // Removed
+  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useClerkUser();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<WatchListNotification[]>([]);
@@ -77,31 +79,33 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect_url=/notifications');
-    } else if (currentUser) {
+    if (clerkLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/notifications'); // Redirect to Clerk sign-in
+    } else if (clerkLoaded && isSignedIn && clerkUser) {
       setIsLoading(true);
-      fetchNotificationsFromFirestore(currentUser.uid) 
+      fetchNotificationsFromFirestore(clerkUser.id) 
         .then(setNotifications)
         .catch(err => {
           console.error("Failed to load notifications:", err);
           setError("Could not load your notifications. Please try again later.");
         })
         .finally(() => setIsLoading(false));
+    } else if (clerkLoaded && !isSignedIn) {
+        setIsLoading(false); // Not signed in, stop loading
     }
-  }, [currentUser, authLoading, router]);
+  }, [clerkUser, clerkLoaded, isSignedIn, router]);
 
   const handleMarkAsRead = async (id: string) => {
-    if (!currentUser) return;
-    const success = await markNotificationAsReadInFirestore(id, currentUser.uid); 
+    if (!clerkUser) return;
+    const success = await markNotificationAsReadInFirestore(id, clerkUser.id); 
     if (success) {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!currentUser) return;
-    const success = await deleteNotificationFromFirestore(id, currentUser.uid); 
+    if (!clerkUser) return;
+    const success = await deleteNotificationFromFirestore(id, clerkUser.id); 
     if (success) {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }
@@ -123,7 +127,7 @@ export default function NotificationsPage() {
     return Math.floor(seconds) + " seconds ago";
   };
 
-  if (authLoading || isLoading) { 
+  if (!clerkLoaded || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -132,8 +136,7 @@ export default function NotificationsPage() {
     );
   }
   
-  // This redirect should be covered by the useEffect above
-  if (!currentUser && !authLoading) {
+  if (clerkLoaded && !isSignedIn) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Button variant="outline" asChild className="mb-6">
@@ -143,7 +146,7 @@ export default function NotificationsPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/login?redirect_url=/notifications" className="underline text-primary">log in</Link> to view your notifications.
+            Please <Link href="/sign-in?redirect_url=/notifications" className="underline text-primary">log in</Link> to view your notifications.
           </AlertDescription>
         </Alert>
       </div>
@@ -220,4 +223,3 @@ export default function NotificationsPage() {
     </div>
   );
 }
-

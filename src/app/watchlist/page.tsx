@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListChecks, Info, Loader2, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/authContext'; // Using Firebase Auth
+// import { useAuth } from '@/contexts/authContext'; // Removed, use Clerk
+import { useUser as useClerkUser } from '@clerk/nextjs'; // Added Clerk's useUser
 import { useRouter } from 'next/navigation';
-import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
+// import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Keep for fallback or remove if direct Firestore fetch is robust
 import { collection, getDocs, query, where, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 
@@ -21,32 +22,35 @@ async function fetchEventsByIds(eventIds: string[]): Promise<Event[]> {
     return [];
   }
   const events: Event[] = [];
-  // Firestore 'in' query limit is 10 (or 30 in some cases). Batch if necessary.
-  // For simplicity, this example assumes eventIds length is within limits.
-  // A more robust solution would batch requests if eventIds.length > 10.
   const batches = [];
-  for (let i = 0; i < eventIds.length; i += 10) {
+  for (let i = 0; i < eventIds.length; i += 10) { // Firestore 'in' query limit
     batches.push(eventIds.slice(i, i + 10));
   }
 
   for (const batch of batches) {
     if (batch.length === 0) continue;
-    const eventsCollectionRef = collection(firestore, 'events');
-    // Note: Using documentId() for filtering is tricky with 'in'.
-    // A common pattern is to fetch each document individually or structure data differently.
-    // For this example, we'll fetch one by one (less efficient for many IDs).
+    // Fetching documents one by one can be inefficient.
+    // A better approach for larger watchlists might involve a more complex data structure or cloud functions.
+    // For now, individual fetches:
     for (const id of batch) {
-        const eventDocRef = doc(firestore, 'events', id);
-        const docSnap = await getDoc(eventDocRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data() as Omit<Event, 'id' | 'createdAt'> & { createdAt: Timestamp, date: Timestamp, endDate?: Timestamp };
-            events.push({ 
-                ...data, 
-                id: docSnap.id, 
-                createdAt: data.createdAt.toDate().toISOString(),
-                date: data.date.toDate().toISOString().split('T')[0],
-                endDate: data.endDate ? data.endDate.toDate().toISOString().split('T')[0] : undefined,
-            });
+        try {
+            const eventDocRef = doc(firestore, 'events', id);
+            const docSnap = await getDoc(eventDocRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data() as Omit<Event, 'id' | 'createdAt'> & { createdAt: Timestamp, date: Timestamp, endDate?: Timestamp };
+                events.push({ 
+                    ...data, 
+                    id: docSnap.id, 
+                    createdAt: (data.createdAt as Timestamp)?.toDate?.().toISOString() || data.createdAt as string,
+                    date: (data.date as Timestamp)?.toDate?.().toISOString().split('T')[0] || data.date as string,
+                    endDate: data.endDate ? ((data.endDate as Timestamp)?.toDate?.().toISOString().split('T')[0] || data.endDate as string) : undefined,
+                });
+            } else {
+                console.warn(`Event with ID ${id} not found in watchlist fetch.`);
+            }
+        } catch (error) {
+            console.error(`Error fetching event ${id} for watchlist:`, error);
+            // Optionally, continue fetching other events or rethrow
         }
     }
   }
@@ -55,7 +59,8 @@ async function fetchEventsByIds(eventIds: string[]): Promise<Event[]> {
 
 
 export default function WatchlistPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  // const { currentUser, loading: authLoading } = useAuth(); // Removed
+  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useClerkUser();
   const router = useRouter();
 
   const [watchlistEvents, setWatchlistEvents] = useState<Event[]>([]);
@@ -63,17 +68,18 @@ export default function WatchlistPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect_url=/watchlist'); 
-    } else if (currentUser) {
+    if (clerkLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/watchlist'); // Redirect to Clerk sign-in
+    } else if (clerkLoaded && isSignedIn && clerkUser) {
       setIsLoading(true);
-      // Fetch watchlist event IDs from localStorage (client-side only)
       const watchlistEventIds: string[] = [];
       if (typeof window !== 'undefined') {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('watchlist_') && key.endsWith(`_${currentUser.uid}`) && localStorage.getItem(key) === 'true') {
-            const eventId = key.split('_')[1]; 
+          // Ensure the key format matches exactly how it's stored.
+          // If watchlist_event_${eventId}_user_${userId} is the format:
+          if (key && key.startsWith('watchlist_event_') && key.endsWith(`_user_${clerkUser.id}`) && localStorage.getItem(key) === 'true') {
+            const eventId = key.split('_')[2]; 
             if (eventId) {
               watchlistEventIds.push(eventId);
             }
@@ -82,21 +88,27 @@ export default function WatchlistPage() {
       }
       
       if (watchlistEventIds.length > 0) {
+        console.log("Fetching watchlist events for IDs:", watchlistEventIds);
         fetchEventsByIds(watchlistEventIds)
-          .then(setWatchlistEvents)
+          .then(fetchedEvents => {
+            setWatchlistEvents(fetchedEvents.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())); // Sort by date
+          })
           .catch(err => {
             console.error("Failed to load watchlist events from Firestore:", err);
             setError("Could not load your watchlist. Please try again later.");
           })
           .finally(() => setIsLoading(false));
       } else {
-        setWatchlistEvents([]); // No items in watchlist
+        console.log("No events in watchlist (localStorage).");
+        setWatchlistEvents([]); 
         setIsLoading(false);
       }
+    } else if (clerkLoaded && !isSignedIn) {
+        setIsLoading(false); // Not signed in, stop loading
     }
-  }, [currentUser, authLoading, router]);
+  }, [clerkUser, clerkLoaded, isSignedIn, router]);
 
-  if (authLoading || isLoading) { 
+  if (!clerkLoaded || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -105,8 +117,7 @@ export default function WatchlistPage() {
     );
   }
 
-  // This redirect should be covered by the useEffect above, but kept as a safeguard
-  if (!currentUser && !authLoading) { 
+  if (clerkLoaded && !isSignedIn) { 
     return (
       <div className="container mx-auto px-4 py-8">
          <Button variant="outline" asChild className="mb-6">
@@ -116,7 +127,7 @@ export default function WatchlistPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/login?redirect_url=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
+            Please <Link href="/sign-in?redirect_url=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
           </AlertDescription>
         </Alert>
       </div>

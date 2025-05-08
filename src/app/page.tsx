@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { FeaturedEventsCarousel } from '@/components/featured-events-carousel';
 import { useUser, SignInButton, SignUpButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Loader2, LogIn, UserPlus, WifiOff, SearchX, ServerCrash } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, WifiOff, SearchX, ServerCrash, ShieldAlert } from 'lucide-react';
 import type { Event as EventType } from '@/types/event';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
@@ -40,23 +41,40 @@ const EventCardSkeleton = () => (
 
 
 export default function HomePage() {
-  const { isSignedIn, isLoaded: isClerkLoaded } = useUser();
+  const { isSignedIn, isLoaded: isClerkLoaded, user } = useUser();
   const [recentEvents, setRecentEvents] = useState<EventType[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [eventError, setEventError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
 
+  // Debug: Log Clerk loading state
+  useEffect(() => {
+    console.log("Clerk isLoaded state:", isClerkLoaded);
+    if(isClerkLoaded && isSignedIn) {
+      console.log("User is signed in:", user?.id);
+    } else if (isClerkLoaded && !isSignedIn) {
+      console.log("User is not signed in.");
+    }
+  }, [isClerkLoaded, isSignedIn, user]);
+
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsOnline(navigator.onLine);
       const handleOnline = () => {
+        console.log("App came online.");
         setIsOnline(true);
-        setEventError(null); // Clear previous offline error
-        // Optionally re-fetch data if coming back online
+        setEventError(null); 
+        // Re-fetch data if coming back online and there was a network error previously
+        if (eventError && eventError.includes("network")) {
+          // Logic to re-trigger event fetch could be added here if desired
+          // For now, let the main event fetching useEffect handle it based on isOnline state.
+        }
       };
       const handleOffline = () => {
+        console.log("App went offline.");
         setIsOnline(false);
-        setEventError("You are offline. Please check your internet connection.");
+        setEventError("You are offline. Please check your internet connection to load live event data.");
         setIsLoadingEvents(false); 
       };
       window.addEventListener('online', handleOnline);
@@ -66,27 +84,27 @@ export default function HomePage() {
         window.removeEventListener('offline', handleOffline);
       };
     }
-  }, []);
+  }, [eventError]);
 
   useEffect(() => {
     if (!isOnline) {
-      // Error is already set by the online/offline listener
-      setIsLoadingEvents(false);
-      return;
+      setIsLoadingEvents(false); // Error is already set by online/offline listener
+      return () => {}; // No cleanup needed for this path
     }
     if (!firestore) {
-       setEventError("Database service is currently unavailable. Please try again later.");
+       setEventError("Database service is currently unavailable. Recent events might not load. Please try again later.");
        setIsLoadingEvents(false);
        console.warn("Firestore not available for recent events fetch.");
-       return;
+       return () => {}; // No cleanup needed
     }
 
     setIsLoadingEvents(true);
     setEventError(null);
-    console.log("Attempting to fetch recent events...");
+    console.log("Attempting to fetch recent events from Firestore...");
 
     const eventsCollectionRef = collection(firestore, 'events');
-    const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(6)); 
+    // Reduced limit for faster initial load during debugging/testing
+    const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(3)); 
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       console.log("Recent events snapshot received:", querySnapshot.size, "documents");
@@ -102,7 +120,7 @@ export default function HomePage() {
         } as EventType);
       });
       setRecentEvents(eventsData);
-      setEventError(null); // Clear any previous error on successful fetch
+      setEventError(null); 
       setIsLoadingEvents(false);
     }, (error) => {
       console.error("Error fetching recent events from Firestore:", error);
@@ -112,31 +130,22 @@ export default function HomePage() {
 
     const loadTimer = setTimeout(() => {
       if (isLoadingEvents) {
-        console.warn("Recent events loading timed out.");
-        setEventError("Loading events is taking longer than usual. Please ensure you have a stable internet connection.");
-        // setIsLoadingEvents(false); // Optionally stop showing skeleton if timeout is too long
+        console.warn("Recent events loading timed out (20s).");
+        setEventError("Loading events is taking longer than usual. Please ensure you have a stable internet connection or try refreshing the page.");
+        setIsLoadingEvents(false); // Stop showing skeleton if timeout
       }
-    }, 20000); // 20-second timeout
+    }, 20000); 
 
     return () => {
       console.log("Unsubscribing from recent events snapshot.");
       unsubscribe();
       clearTimeout(loadTimer);
     };
-  }, [isOnline]); // Re-fetch if online status changes and was previously offline.
+  }, [isOnline]); 
 
-  // Combined initial loading state for Clerk and basic connectivity
-  if (!isClerkLoaded) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Initializing Local Pulse...</p>
-      </div>
-    );
-  }
   
   const renderHeroSection = () => (
-    <section className="w-full py-16 md:py-24 text-center relative overflow-hidden bg-card/50 glassmorphism-light dark:glassmorphism-dark rounded-xl shadow-xl">
+    <section className="w-full py-16 md:py-24 text-center relative overflow-hidden bg-card/50 glassmorphism-light dark:glassmorphism-dark rounded-xl shadow-xl mb-10">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-30 mix-blend-multiply dark:opacity-50"></div>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.h1
@@ -149,12 +158,12 @@ export default function HomePage() {
             className="text-md sm:text-lg text-muted-foreground max-w-lg mx-auto mb-8"
             initial="hidden" animate="visible" variants={taglineVariants}
         >
-            {!isSignedIn 
+            {!isSignedIn && isClerkLoaded
             ? "Sign in to explore, create, and share events happening near you. Your local pulse, at your fingertips."
-            : "Explore events, manage your watchlist, or create your own!"
+            : (isSignedIn && isClerkLoaded ? "Explore events, manage your watchlist, or create your own!" : "Authenticating your experience...")
             }
         </motion.p>
-        {!isSignedIn && (
+        {!isSignedIn && isClerkLoaded && ( // Only show if Clerk is loaded and user is not signed in
             <motion.div 
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
             initial="hidden" animate="visible" variants={buttonVariants}
@@ -182,6 +191,16 @@ export default function HomePage() {
     </section>
   );
 
+  // Main loading state: Covers Clerk initialization and initial online check
+  if (!isClerkLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Initializing Local Pulse...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center w-full py-6 px-2 sm:px-4">
       {renderHeroSection()}
@@ -193,42 +212,35 @@ export default function HomePage() {
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary tracking-tight">
             Recent Events
           </h2>
-          {!isOnline && eventError && (
-             <Alert variant="destructive" className="my-8">
-              <WifiOff className="h-5 w-5" />
-              <AlertTitle>Offline</AlertTitle>
-              <AlertDescription>{eventError}</AlertDescription>
-            </Alert>
-          )}
-          {isOnline && isLoadingEvents && !eventError && (
+          {isLoadingEvents && !eventError && ( // Show skeletons only if actively loading events and no general error
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {[...Array(3)].map((_, i) => <EventCardSkeleton key={i} />)}
             </div>
           )}
-          {isOnline && !isLoadingEvents && eventError && (
-            <Alert variant="destructive" className="my-8">
-              <ServerCrash className="h-5 w-5" />
-              <AlertTitle>Error Loading Events</AlertTitle>
+          {eventError && ( // Display event-specific or general errors
+             <Alert variant="destructive" className="my-8">
+              {eventError.includes("offline") || eventError.includes("network") ? <WifiOff className="h-5 w-5" /> : <ServerCrash className="h-5 w-5" />}
+              <AlertTitle>{eventError.includes("offline") || eventError.includes("network") ? "Network Issue" : "Error Loading Events"}</AlertTitle>
               <AlertDescription>{eventError}</AlertDescription>
             </Alert>
           )}
-          {isOnline && !isLoadingEvents && !eventError && recentEvents.length > 0 && (
+          {!isLoadingEvents && !eventError && recentEvents.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {recentEvents.map((event) => (
                 <EventCard key={event.id} event={event} />
               ))}
             </div>
           )}
-          {isOnline && !isLoadingEvents && !eventError && recentEvents.length === 0 && (
+          {!isLoadingEvents && !eventError && recentEvents.length === 0 && (
             <Alert className="my-8">
                 <SearchX className="h-5 w-5" />
-                <AlertTitle>No Recent Events</AlertTitle>
+                <AlertTitle>No Recent Events Found</AlertTitle>
                 <AlertDescription>
-                No recent events found.
-                {isSignedIn ? (
+                It seems there are no recent events to display right now.
+                {isClerkLoaded && isSignedIn ? (
                     <> Be the first to <Link href="/dashboard" className="text-primary hover:underline font-semibold">create one</Link>!</>
                 ) : (
-                    <> <SignInButton mode="modal"><Button variant="link" className="p-0 h-auto text-primary hover:underline font-semibold">Sign in</Button></SignInButton> to create events.</>
+                  isClerkLoaded && <> <SignInButton mode="modal"><Button variant="link" className="p-0 h-auto text-primary hover:underline font-semibold">Sign in</Button></SignInButton> to create and see more events.</>
                 )}
                 </AlertDescription>
             </Alert>
