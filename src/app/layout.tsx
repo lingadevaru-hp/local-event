@@ -8,14 +8,8 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
-import dynamic from 'next/dynamic'; // Import dynamic
+import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
 
-// Dynamically import SpeedInsights for client-side rendering and to handle potential load issues
-// Added SpeedInsights for performance monitoring; dynamically imported to prevent runtime errors.
-const SpeedInsightsDynamic = dynamic(
-  () => import('@vercel/speed-insights/next').then(mod => mod.SpeedInsights),
-  { ssr: false, loading: () => null } // Using null for loading, can be a custom component e.g. <div>Loading Speed Insights...</div>
-);
 
 export const metadata: Metadata = {
   title: 'Local Pulse Karnataka - Discover Events',
@@ -91,7 +85,7 @@ export default function RootLayout({
         }
       }}
     >
-      <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+      <html lang="en" className={GeistSans.className} suppressHydrationWarning>
         <head>
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -116,8 +110,7 @@ export default function RootLayout({
               <Toaster />
             </ThemeProvider>
           </AuthProvider>
-          {/* Conditionally render SpeedInsights for production after other primary components */}
-          {process.env.NODE_ENV === 'production' && <SpeedInsightsDynamic />}
+          <SpeedInsightsWrapper />
         </body>
       </html>
     </ClerkProvider>
