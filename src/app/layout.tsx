@@ -5,9 +5,9 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { ThemeProvider } from '@/components/providers'; // Updated Providers to ThemeProvider
-import { AuthProvider } from '@/contexts/authContext'; // New Firebase Auth Provider
-import { BottomNavigationBar } from '@/components/bottom-navigation-bar'; // New Bottom Navigation
+import { ThemeProvider } from '@/components/theme-provider';
+import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
+import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
 
 export const metadata: Metadata = {
@@ -23,20 +23,17 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  // Open Graph data
   openGraph: {
     type: "website",
     siteName: "Local Pulse Karnataka",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
   },
-  // Twitter data
   twitter: {
     card: "summary",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
   },
-  // Icons for PWA
   icons: [
     { rel: "apple-touch-icon", url: "/icons/icon-192x192.png" },
     { rel: "icon", url: "/icons/icon-192x192.png" },
@@ -45,14 +42,13 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [ 
-    { media: '(prefers-color-scheme: light)', color: 'hsl(0 0% 100%)' }, // White for light mode
-    { media: '(prefers-color-scheme: dark)', color: 'hsl(222.2 84% 4.9%)' }, // Dark for dark mode
+    { media: '(prefers-color-scheme: light)', color: 'hsl(240 5% 96%)' }, // Updated to new light theme background
+    { media: '(prefers-color-scheme: dark)', color: 'hsl(240 6% 10%)' }, // Updated to new dark theme background
   ],
-  // PWA specific viewport settings
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Consider if users should be able to zoom
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -61,7 +57,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
       <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <head>
           {/* Standard PWA meta tags */}
@@ -72,36 +70,34 @@ export default function RootLayout({
           <meta name="format-detection" content="telephone=no" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="msapplication-config" content="/icons/browserconfig.xml" />
-          <meta name="msapplication-TileColor" content="#3498db" />
+          <meta name="msapplication-TileColor" content="#007AFF" /> {/* Apple Blue */}
           <meta name="msapplication-tap-highlight" content="no" />
           
-          {/* Link to manifest.json */}
           <link rel="manifest" href="/manifest.json" />
           
           {/* Theme color for browser UI */}
-          <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-          <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)" />
+          <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)" />
+          <meta name="theme-color" content="#1D1D1F" media="(prefers-color-scheme: dark)" />
 
-
-          {/* Apple touch icons */}
           <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
           <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-          <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" /> {/* Using 192 as closest for 180 */}
-          <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" /> {/* Using 192 as closest for 167 */}
+          <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+          <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" />
 
-          {/* Other icons */}
-          <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" /> {/* Example, adjust to actual icon sizes */}
-          <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" /> {/* Example, adjust to actual icon sizes */}
-
+          <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
+          <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
         </head>
-        <body className="antialiased flex flex-col min-h-screen">
-          <AuthProvider>
+        <body className="antialiased flex flex-col min-h-screen bg-background text-foreground">
+          {/* AuthProvider might be redundant if Clerk handles all user state, review if needed later */}
+          <AuthProvider> 
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               <div className="relative flex min-h-screen flex-col">
                 <SiteHeader />
-                <main className="flex-1 pb-16 sm:pb-0">{children}</main> {/* Padding bottom for bottom nav on mobile */}
+                <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6"> {/* Added padding top and horizontal padding */}
+                  {children}
+                </main>
                 <SiteFooter />
-                <BottomNavigationBar /> {/* Add bottom navigation */}
+                <BottomNavigationBar />
               </div>
               <Toaster />
             </ThemeProvider>
