@@ -2,84 +2,128 @@
 'use client';
 import type React from 'react'; 
 import { useEffect, useState, use } from 'react'; 
-import type { Event, Rating as RatingType } from '@/types/event'; //Removed AppUser as it's covered by Clerk
+import type { Event, Rating as RatingType } from '@/types/event'; 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
-import { CalendarDays, MapPin, Star, Tag, User as UserIcon, Send, Loader2, Languages, IndianRupee, Landmark, Heart, CheckCircle, ExternalLink, UserCircle as UserCircleIcon, ArrowLeft, Ticket } from 'lucide-react';
+import { CalendarDays, MapPin, Star, Tag, User as UserIcon, Send, Loader2, Languages, IndianRupee, Landmark, Heart, CheckCircle, ExternalLink, UserCircle as UserCircleIcon, ArrowLeft, Ticket, Share2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/authContext'; // Using Firebase Auth
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, increment, runTransaction, Timestamp } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
 
+// Function to fetch event by ID from Firestore
 async function fetchEventById(id: string): Promise<Event | null> {
-  console.log("Fetching event by ID:", id);
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const event = MOCK_EVENTS_DATA.find(e => e.id === id) || null;
-      if (event) console.log("Event found:", event.name);
-      else console.log("Event not found for ID:", id);
-      resolve(event);
-    }, 500);
-  });
-}
-
-async function submitReview(eventId: string, rating: number, reviewText: string, clerkUser: ReturnType<typeof useUser>['user']): Promise<RatingType> {
-   console.log("Submitting review for event:", eventId, "Rating:", rating, "Review:", reviewText);
-   return new Promise(resolve => {
-    setTimeout(() => {
-      const newReview: RatingType = {
-        id: `r${Date.now()}`,
-        userId: clerkUser?.id || 'anonymousUser', 
-        eventId,
-        rating,
-        reviewText,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        user: { 
-            id: clerkUser?.id || 'anonymousUser', 
-            username: clerkUser?.username || clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Anonymous', 
-            name: clerkUser?.fullName || 'Anonymous User',
-            photoURL: clerkUser?.imageUrl || undefined,
-            languagePreference: 'English', 
-        }
+  if (!firestore) {
+    console.error("Firestore not initialized");
+    return null;
+  }
+  console.log("Fetching event by ID from Firestore:", id);
+  try {
+    const eventDocRef = doc(firestore, 'events', id);
+    const docSnap = await getDoc(eventDocRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data() as Omit<Event, 'id' | 'createdAt'> & { createdAt: Timestamp, date: Timestamp, endDate?: Timestamp };
+      console.log("Event found in Firestore:", data.name);
+      // Convert Firestore Timestamps to string dates for client-side Event type compatibility
+      return { 
+        ...data, 
+        id: docSnap.id, 
+        createdAt: data.createdAt.toDate().toISOString(),
+        date: data.date.toDate().toISOString().split('T')[0], // YYYY-MM-DD
+        endDate: data.endDate ? data.endDate.toDate().toISOString().split('T')[0] : undefined,
       };
-      const eventIndex = MOCK_EVENTS_DATA.findIndex(e => e.id === eventId);
-      if (eventIndex > -1) {
-        const existingRatings = MOCK_EVENTS_DATA[eventIndex].ratings || [];
-        const userPreviousReviewIndex = existingRatings.findIndex(r => r.userId === newReview.userId);
-        if(userPreviousReviewIndex > -1) {
-            MOCK_EVENTS_DATA[eventIndex].ratings![userPreviousReviewIndex] = newReview;
-        } else {
-            MOCK_EVENTS_DATA[eventIndex].ratings = [...existingRatings, newReview];
-        }
-        const totalRatingSum = MOCK_EVENTS_DATA[eventIndex].ratings!.reduce((sum, r) => sum + r.rating, 0);
-        MOCK_EVENTS_DATA[eventIndex].averageRating = MOCK_EVENTS_DATA[eventIndex].ratings!.length > 0 ? totalRatingSum / MOCK_EVENTS_DATA[eventIndex].ratings!.length : 0;
-      }
-      resolve(newReview);
-    }, 1000);
-  });
+    } else {
+      console.log("No such event document in Firestore for ID:", id);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching event from Firestore:", error);
+    return null;
+  }
 }
 
-async function signUpForEvent(eventId: string, userId: string): Promise<{ success: boolean; message: string }> {
-    console.log(`User ${userId} signing up for event ${eventId}`);
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const success = Math.random() > 0.1; 
-            if (success) {
-                console.log(`User ${userId} successfully signed up for event ${eventId}`);
-                resolve({ success: true, message: "Successfully signed up for the event!" });
-            } else {
-                resolve({ success: false, message: "Failed to sign up for the event. Please try again." });
-            }
-        }, 1000);
+// Function to submit review (ratings will be stored as a subcollection or array in the event document)
+async function submitReviewToFirestore(eventId: string, ratingValue: number, reviewText: string, firebaseUser: NonNullable<ReturnType<typeof useAuth>['currentUser']>, appProfile: NonNullable<ReturnType<typeof useAuth>['appUser']> | null): Promise<RatingType> {
+  if (!firestore) throw new Error("Firestore not initialized");
+
+  const newReview: RatingType = {
+    id: `r_${Date.now()}_${firebaseUser.uid}`, // More unique ID
+    userId: firebaseUser.uid,
+    eventId,
+    rating: ratingValue,
+    reviewText,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    user: {
+        id: firebaseUser.uid,
+        username: appProfile?.username || firebaseUser.email?.split('@')[0] || 'Anonymous',
+        name: appProfile?.name || firebaseUser.displayName || 'Anonymous User',
+        photoURL: appProfile?.photoURL || firebaseUser.photoURL || undefined,
+        languagePreference: appProfile?.languagePreference || 'English',
+    }
+  };
+
+  const eventDocRef = doc(firestore, 'events', eventId);
+
+  try {
+    await runTransaction(firestore, async (transaction) => {
+      const eventDoc = await transaction.get(eventDocRef);
+      if (!eventDoc.exists()) {
+        throw "Event document does not exist!";
+      }
+      
+      const currentEventData = eventDoc.data() as Event;
+      const existingRatings = currentEventData.ratings || [];
+      const userPreviousReviewIndex = existingRatings.findIndex(r => r.userId === firebaseUser.uid);
+
+      let updatedRatingsArray;
+      if (userPreviousReviewIndex > -1) {
+        // User is updating their review
+        updatedRatingsArray = existingRatings.map((r, index) => index === userPreviousReviewIndex ? newReview : r);
+      } else {
+        // New review
+        updatedRatingsArray = [...existingRatings, newReview];
+      }
+      
+      const totalRatingSum = updatedRatingsArray.reduce((sum, r) => sum + r.rating, 0);
+      const newAverageRating = updatedRatingsArray.length > 0 ? totalRatingSum / updatedRatingsArray.length : 0;
+
+      transaction.update(eventDocRef, { 
+        ratings: updatedRatingsArray,
+        averageRating: newAverageRating 
+      });
     });
+    console.log("Review submitted and event updated successfully.");
+    return newReview;
+  } catch (error) {
+    console.error("Transaction failed: ", error);
+    throw error;
+  }
+}
+
+
+// Function to sign up for event (e.g., add user ID to an 'attendees' array in the event document)
+async function signUpForEventInFirestore(eventId: string, userId: string): Promise<{ success: boolean; message: string }> {
+  if (!firestore) return { success: false, message: "Database not initialized." };
+  console.log(`User ${userId} signing up for event ${eventId} in Firestore`);
+  try {
+    const eventDocRef = doc(firestore, 'events', eventId);
+    await updateDoc(eventDocRef, {
+      attendees: arrayUnion(userId) // Adds userId to attendees array if not already present
+    });
+    return { success: true, message: "Successfully signed up for the event!" };
+  } catch (error) {
+    console.error("Error signing up for event in Firestore:", error);
+    return { success: false, message: "Failed to sign up. Please try again." };
+  }
 }
 
 
@@ -88,11 +132,11 @@ interface EventPageProps {
 }
 
 export default function EventPage({ params: paramsProp }: EventPageProps) {
-  const params = use(paramsProp); 
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const resolvedParams = use(paramsProp); 
+  const { currentUser, appUser, loading: authLoading } = useAuth();
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   
   const [userRating, setUserRating] = useState(0);
@@ -105,37 +149,42 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    const eventId = params.id;
+    const eventId = resolvedParams.id;
     if (eventId) {
-      setIsLoading(true);
+      setIsLoadingEvent(true);
       setError(null); 
       fetchEventById(eventId)
         .then(data => {
           if (data) {
             setEvent(data);
-            if (isSignedIn && clerkUser && data.ratings) {
-              const existingReview = data.ratings.find(r => r.userId === clerkUser.id);
+            // If user is logged in, check for existing review
+            if (currentUser && data.ratings) {
+              const existingReview = data.ratings.find(r => r.userId === currentUser.uid);
               if (existingReview) {
                 setUserRating(existingReview.rating);
                 setUserReviewText(existingReview.reviewText || '');
               }
             }
+            // Check watchlist status from localStorage (client-side only)
             if (typeof window !== 'undefined') {
-                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${clerkUser?.id || 'guest'}`) === 'true');
+                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${currentUser?.uid || 'guest'}`) === 'true');
             }
           } else {
             setError('Event not found.');
           }
         })
-        .catch(() => setError('Failed to load event details.'))
-        .finally(() => setIsLoading(false));
+        .catch((err) => {
+          console.error("Error in fetchEventById promise chain:", err);
+          setError('Failed to load event details.');
+        })
+        .finally(() => setIsLoadingEvent(false));
     }
-  }, [params.id, clerkUser, isSignedIn]);
+  }, [resolvedParams.id, currentUser]);
 
   const handleRatingSubmit = async () => {
-    if (!isSignedIn || !clerkUser) {
+    if (!currentUser) {
       toast({ title: "Login Required", description: "Please log in to submit a review.", variant: "destructive" });
-      router.push(`/sign-in?redirect_url=/events/${params.id}`);
+      router.push(`/login?redirect_url=/events/${resolvedParams.id}`);
       return;
     }
     if (userRating === 0) {
@@ -144,10 +193,11 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     }
     setIsSubmittingReview(true);
     try {
-      const newReview = await submitReview(params.id, userRating, userReviewText, clerkUser);
+      const newReview = await submitReviewToFirestore(resolvedParams.id, userRating, userReviewText, currentUser, appUser);
+      // Optimistically update UI or re-fetch event
       setEvent(prevEvent => {
         if (!prevEvent) return null;
-        const otherReviews = prevEvent.ratings?.filter(r => r.userId !== clerkUser.id) || [];
+        const otherReviews = prevEvent.ratings?.filter(r => r.userId !== currentUser.uid) || [];
         const updatedRatings = [...otherReviews, newReview];
         const totalRatingSum = updatedRatings.reduce((sum, r) => sum + r.rating, 0);
         const newAverageRating = updatedRatings.length > 0 ? totalRatingSum / updatedRatings.length : 0;
@@ -163,15 +213,16 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   };
 
   const handleEventSignUp = async () => {
-    if (!isSignedIn || !clerkUser) {
+    if (!currentUser) {
         toast({ title: "Login Required", description: "Please log in to sign up for this event.", variant: "destructive" });
-        router.push(`/sign-in?redirect_url=/events/${params.id}`);
+        router.push(`/login?redirect_url=/events/${resolvedParams.id}`);
         return;
     }
     setIsSigningUp(true);
-    const result = await signUpForEvent(params.id, clerkUser.id);
+    const result = await signUpForEventInFirestore(resolvedParams.id, currentUser.uid);
     if (result.success) {
         toast({ title: "Event Signup Successful", description: result.message });
+        // Potentially update UI to show user is signed up
     } else {
         toast({ title: "Event Signup Failed", description: result.message, variant: "destructive" });
     }
@@ -179,17 +230,18 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   };
 
   const handleToggleWatchlist = async () => {
-    if (!isSignedIn || !clerkUser) {
+    if (!currentUser) {
       toast({ title: "Login Required", description: "Please log in to manage your watchlist.", variant: "destructive" });
-      router.push(`/sign-in?redirect_url=/events/${params.id}`);
+      router.push(`/login?redirect_url=/events/${resolvedParams.id}`);
       return;
     }
     setIsWatchlistLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); 
+    // Simulate async operation if needed, e.g., saving to Firestore user profile
+    await new Promise(resolve => setTimeout(resolve, 300)); 
     const newWatchlistStatus = !isInWatchlist;
-    const watchlistItemKey = `watchlist_${params.id}_${clerkUser.id}`; 
+    const watchlistItemKey = `watchlist_${resolvedParams.id}_${currentUser.uid}`; 
     setIsInWatchlist(newWatchlistStatus);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') { // Ensure localStorage is available
         if (newWatchlistStatus) {
         localStorage.setItem(watchlistItemKey, 'true');
         toast({ title: "Added to Watchlist!", description: `${event?.name} is now in your watchlist.` });
@@ -201,7 +253,34 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     setIsWatchlistLoading(false);
   };
 
-  if (!isLoaded || isLoading) { 
+  const handleShareEvent = async () => {
+    if (navigator.share && event) {
+      try {
+        await navigator.share({
+          title: event.name,
+          text: `Check out this event: ${event.name} - ${event.description.substring(0,100)}...`,
+          url: window.location.href,
+        });
+        toast({title: "Event Shared!", description: "Thanks for sharing."});
+      } catch (error) {
+        console.error('Error sharing event:', error);
+        toast({title: "Share Failed", description: "Could not share the event.", variant: "destructive"});
+      }
+    } else {
+      // Fallback for browsers that don't support Web Share API (e.g., copy link to clipboard)
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({title: "Link Copied!", description: "Event link copied to clipboard."});
+      } catch (err) {
+         toast({title: "Share Not Available", description: "Sharing is not available on this browser or device.", variant: "destructive"});
+      }
+    }
+     if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(50); // Haptic feedback
+    }
+  };
+
+  if (authLoading || isLoadingEvent) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -283,11 +362,11 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
 
             
             <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-3">
-                <Button onClick={handleEventSignUp} disabled={isSigningUp} className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button onClick={handleEventSignUp} disabled={isSigningUp || !currentUser} className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
                     {isSigningUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ticket className="mr-2 h-4 w-4" />}
                     Sign Up for Event
                 </Button>
-                {isSignedIn && (
+                {currentUser && (
                     <Button onClick={handleToggleWatchlist} disabled={isWatchlistLoading} variant={isInWatchlist ? "secondary" : "outline"} className="w-full sm:w-auto">
                     {isWatchlistLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isInWatchlist ? <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> : <Heart className="mr-2 h-4 w-4" />)}
                     {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -300,6 +379,9 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                         </a>
                     </Button>
                 )}
+                 <Button onClick={handleShareEvent} variant="outline" className="w-full sm:w-auto">
+                    <Share2 className="mr-2 h-4 w-4" /> Share Event
+                </Button>
             </div>
 
 
@@ -307,10 +389,10 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
 
             <section>
               <h2 className="text-2xl font-semibold mb-4 text-primary">Reviews & Ratings</h2>
-              {isSignedIn && clerkUser ? (
+              {currentUser ? (
                 <div className="mb-6 p-4 border rounded-lg bg-secondary/30">
                   <h3 className="text-lg font-medium mb-2">
-                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Your Review' : 'Leave a Review'}
+                    {event.ratings?.find(r => r.userId === currentUser.uid) ? 'Update Your Review' : 'Leave a Review'}
                   </h3>
                   <div className="flex items-center mb-3 space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -321,14 +403,14 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                   <Textarea placeholder="Share your experience..." value={userReviewText} onChange={(e) => setUserReviewText(e.target.value)} className="mb-3 min-h-[100px]" aria-label="Your review text" />
                   <Button onClick={handleRatingSubmit} disabled={isSubmittingReview || userRating === 0} className="bg-accent text-accent-foreground hover:bg-accent/90">
                     {isSubmittingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Review' : 'Submit Review'}
+                    {event.ratings?.find(r => r.userId === currentUser.uid) ? 'Update Review' : 'Submit Review'}
                   </Button>
                 </div>
               ) : (
                 <Alert>
                   <Star className="h-4 w-4" />
                   <AlertDescription>
-                    <Link href={`/sign-in?redirect_url=/events/${params.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review or sign up for this event.
+                    <Link href={`/login?redirect_url=/events/${resolvedParams.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review or sign up for this event.
                   </AlertDescription>
                 </Alert>
               )}
@@ -359,7 +441,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                   ))}
                 </div>
               ) : (
-                !isSignedIn && event.ratings?.length === 0 ? null : <p className="text-muted-foreground mt-4">No reviews yet. Be the first to leave one!</p>
+                !currentUser && event.ratings?.length === 0 ? null : <p className="text-muted-foreground mt-4">No reviews yet. Be the first to leave one!</p>
               )}
             </section>
           </div>
@@ -409,7 +491,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                 </div>
                 {event.culturalRelevance && event.culturalRelevance.length > 0 && (
                     <div className="flex items-start">
-                        <Star className="h-5 w-5 mr-3 mt-0.5 text-accent flex-shrink-0" />
+                        <Star className="h-5 w-5 mr-3 mt-0.5 text-accent flex-shrink-0" /> {/* Using Star as a generic icon for cultural relevance */}
                         <div>
                         <p className="font-medium">Cultural Relevance</p>
                         <div className="flex flex-wrap gap-1 mt-1">

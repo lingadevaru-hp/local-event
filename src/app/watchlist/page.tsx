@@ -8,32 +8,54 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListChecks, Info, Loader2, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/authContext'; // Using Firebase Auth
 import { useRouter } from 'next/navigation';
 import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
+import { collection, getDocs, query, where, Timestamp, doc, getDoc } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
 
-async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
-  console.log('Fetching watchlist for user:', userId);
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  const watchlistEventIds: string[] = [];
-  if (typeof window !== 'undefined') {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('watchlist_') && key.endsWith(`_${userId}`) && localStorage.getItem(key) === 'true') {
-        const eventId = key.split('_')[1]; 
-        if (eventId) {
-          watchlistEventIds.push(eventId);
+
+// Function to fetch events by IDs from Firestore
+async function fetchEventsByIds(eventIds: string[]): Promise<Event[]> {
+  if (!firestore || eventIds.length === 0) {
+    return [];
+  }
+  const events: Event[] = [];
+  // Firestore 'in' query limit is 10 (or 30 in some cases). Batch if necessary.
+  // For simplicity, this example assumes eventIds length is within limits.
+  // A more robust solution would batch requests if eventIds.length > 10.
+  const batches = [];
+  for (let i = 0; i < eventIds.length; i += 10) {
+    batches.push(eventIds.slice(i, i + 10));
+  }
+
+  for (const batch of batches) {
+    if (batch.length === 0) continue;
+    const eventsCollectionRef = collection(firestore, 'events');
+    // Note: Using documentId() for filtering is tricky with 'in'.
+    // A common pattern is to fetch each document individually or structure data differently.
+    // For this example, we'll fetch one by one (less efficient for many IDs).
+    for (const id of batch) {
+        const eventDocRef = doc(firestore, 'events', id);
+        const docSnap = await getDoc(eventDocRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data() as Omit<Event, 'id' | 'createdAt'> & { createdAt: Timestamp, date: Timestamp, endDate?: Timestamp };
+            events.push({ 
+                ...data, 
+                id: docSnap.id, 
+                createdAt: data.createdAt.toDate().toISOString(),
+                date: data.date.toDate().toISOString().split('T')[0],
+                endDate: data.endDate ? data.endDate.toDate().toISOString().split('T')[0] : undefined,
+            });
         }
-      }
     }
   }
-  return MOCK_EVENTS_DATA.filter(event => watchlistEventIds.includes(event.id));
+  return events;
 }
 
 
 export default function WatchlistPage() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [watchlistEvents, setWatchlistEvents] = useState<Event[]>([]);
@@ -41,23 +63,40 @@ export default function WatchlistPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/watchlist'); 
-    } else if (isSignedIn && clerkUser) {
+    if (!authLoading && !currentUser) {
+      router.push('/login?redirect_url=/watchlist'); 
+    } else if (currentUser) {
       setIsLoading(true);
-      fetchWatchlistEvents(clerkUser.id) 
-        .then(setWatchlistEvents)
-        .catch(err => {
-          console.error("Failed to load watchlist:", err);
-          setError("Could not load your watchlist. Please try again later.");
-        })
-        .finally(() => setIsLoading(false));
-    } else if (isLoaded && !isSignedIn) {
-        setIsLoading(false); 
+      // Fetch watchlist event IDs from localStorage (client-side only)
+      const watchlistEventIds: string[] = [];
+      if (typeof window !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('watchlist_') && key.endsWith(`_${currentUser.uid}`) && localStorage.getItem(key) === 'true') {
+            const eventId = key.split('_')[1]; 
+            if (eventId) {
+              watchlistEventIds.push(eventId);
+            }
+          }
+        }
+      }
+      
+      if (watchlistEventIds.length > 0) {
+        fetchEventsByIds(watchlistEventIds)
+          .then(setWatchlistEvents)
+          .catch(err => {
+            console.error("Failed to load watchlist events from Firestore:", err);
+            setError("Could not load your watchlist. Please try again later.");
+          })
+          .finally(() => setIsLoading(false));
+      } else {
+        setWatchlistEvents([]); // No items in watchlist
+        setIsLoading(false);
+      }
     }
-  }, [clerkUser, isLoaded, isSignedIn, router]);
+  }, [currentUser, authLoading, router]);
 
-  if (!isLoaded || isLoading) { 
+  if (authLoading || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -66,7 +105,8 @@ export default function WatchlistPage() {
     );
   }
 
-  if (isLoaded && !isSignedIn) { 
+  // This redirect should be covered by the useEffect above, but kept as a safeguard
+  if (!currentUser && !authLoading) { 
     return (
       <div className="container mx-auto px-4 py-8">
          <Button variant="outline" asChild className="mb-6">
@@ -76,7 +116,7 @@ export default function WatchlistPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/sign-in?redirect_url=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
+            Please <Link href="/login?redirect_url=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
           </AlertDescription>
         </Alert>
       </div>

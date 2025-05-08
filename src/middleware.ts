@@ -1,36 +1,29 @@
 
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-const isPublicRoute = createRouteMatcher([
-  '/', 
-  '/events/(.*)', // Allows viewing specific event details
-  '/sign-in(.*)', 
-  '/sign-up(.*)', 
-  '/api/webhook/clerk(.*)', // Clerk webhooks should be public
-  // Add other public routes here if any (e.g., about page, contact page)
-]);
+// This middleware function can be expanded later if needed for other purposes.
+// For now, it doesn't enforce any specific authentication beyond what app pages might do.
+export function middleware(request: NextRequest) {
+  // Example: You could add logic here to redirect users based on cookies, headers, etc.
+  // if (request.nextUrl.pathname.startsWith('/admin') && !request.cookies.has('admin_token')) {
+  //   return NextResponse.redirect(new URL('/login', request.url));
+  // }
 
-// Routes that require authentication
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/profile(.*)',
-  '/watchlist(.*)',
-  '/notifications(.*)',
-  // Add other routes that need protection
-]);
-
-export default clerkMiddleware((auth, req) => {
-  if (isProtectedRoute(req)) {
-    auth().protect(); // Protects the route if it matches any in isProtectedRoute
-  }
-  // Public routes are accessible by default if not matched by isProtectedRoute
-});
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
-    '/(api|trpc)(.*)',
+    // Match all request paths except for the ones starting with:
+    // - api (API routes)
+    // - _next/static (static files)
+    // - _next/image (image optimization files)
+    // - favicon.ico (favicon file)
+    // - icons/ (PWA icons)
+    // - sw.js (Service Worker)
+    // - manifest.json (PWA manifest)
+    // - firebase-messaging-sw.js (Firebase messaging service worker)
+    '/((?!api|_next/static|_next/image|favicon.ico|icons/|sw.js|manifest.json|firebase-messaging-sw.js).*)',
   ],
 };

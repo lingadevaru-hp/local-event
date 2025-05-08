@@ -9,57 +9,67 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import type { WatchListNotification } from '@/types/event';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/authContext'; // Using Firebase Auth
 import { useRouter } from 'next/navigation';
+import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
 
-const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
-  { 
-    id: 'notif1', userId: 'mockUserId123', eventId: '1', 
-    message: 'Kala Utsava Bengaluru is starting in 3 days!', 
-    type: 'DATE_NEAR', createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), isRead: false 
-  },
-  { 
-    id: 'notif2', userId: 'mockUserId123', eventId: '3', 
-    message: 'Price reduced for Yakshagana Sammelana Udupi! Now ₹40.', 
-    type: 'PRICE_REDUCED', createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), isRead: false
-  },
-    { 
-    id: 'notif3', userId: 'clerk_user_id_placeholder', eventId: '2', 
-    message: 'Mysuru Dasara Tech Hackathon has new updates!', 
-    type: 'LOCATION_UPDATED', createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString(), isRead: true
-  },
-];
 
-let mockNotificationsData = [...MOCK_NOTIFICATIONS_STORE];
-
-async function fetchNotifications(userId: string): Promise<WatchListNotification[]> {
-  console.log('Fetching notifications for user:', userId);
-  await new Promise(resolve => setTimeout(resolve, 700));
-  return mockNotificationsData.filter(n => n.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
-
-async function markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
-  console.log('Marking notification as read:', notificationId, 'for user:', userId);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const index = mockNotificationsData.findIndex(n => n.id === notificationId && n.userId === userId);
-  if (index > -1) {
-    mockNotificationsData[index] = { ...mockNotificationsData[index], isRead: true };
-    return true;
+async function fetchNotificationsFromFirestore(userId: string): Promise<WatchListNotification[]> {
+  if (!firestore) {
+    console.error("Firestore not initialized");
+    return [];
   }
-  return false;
+  console.log('Fetching notifications for user from Firestore:', userId);
+  try {
+    const notificationsColRef = collection(firestore, `users/${userId}/notifications`);
+    const q = query(notificationsColRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const fetchedNotifications: WatchListNotification[] = [];
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Omit<WatchListNotification, 'id' | 'createdAt'> & { createdAt: Timestamp };
+      fetchedNotifications.push({ 
+        ...data, 
+        id: docSnap.id,
+        createdAt: data.createdAt.toDate().toISOString() // Convert Timestamp to ISO string
+      });
+    });
+    return fetchedNotifications;
+  } catch (error) {
+    console.error("Error fetching notifications from Firestore:", error);
+    throw error; // Rethrow to be caught by caller
+  }
 }
 
-async function deleteNotification(notificationId: string, userId: string): Promise<boolean> {
-  console.log('Deleting notification:', notificationId, 'for user:', userId);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const initialLength = mockNotificationsData.length;
-  mockNotificationsData = mockNotificationsData.filter(n => !(n.id === notificationId && n.userId === userId));
-  return mockNotificationsData.length < initialLength;
+async function markNotificationAsReadInFirestore(notificationId: string, userId: string): Promise<boolean> {
+   if (!firestore) return false;
+   console.log('Marking notification as read in Firestore:', notificationId, 'for user:', userId);
+   try {
+    const notifDocRef = doc(firestore, `users/${userId}/notifications`, notificationId);
+    await updateDoc(notifDocRef, { isRead: true });
+    return true;
+   } catch (error) {
+    console.error("Error marking notification as read:", error);
+    return false;
+   }
+}
+
+async function deleteNotificationFromFirestore(notificationId: string, userId: string): Promise<boolean> {
+  if (!firestore) return false;
+  console.log('Deleting notification from Firestore:', notificationId, 'for user:', userId);
+  try {
+    const notifDocRef = doc(firestore, `users/${userId}/notifications`, notificationId);
+    await deleteDoc(notifDocRef);
+    return true;
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    return false;
+  }
 }
 
 
 export default function NotificationsPage() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<WatchListNotification[]>([]);
@@ -67,33 +77,31 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/notifications');
-    } else if (isSignedIn && clerkUser) {
+    if (!authLoading && !currentUser) {
+      router.push('/login?redirect_url=/notifications');
+    } else if (currentUser) {
       setIsLoading(true);
-      fetchNotifications(clerkUser.id) 
+      fetchNotificationsFromFirestore(currentUser.uid) 
         .then(setNotifications)
         .catch(err => {
           console.error("Failed to load notifications:", err);
           setError("Could not load your notifications. Please try again later.");
         })
         .finally(() => setIsLoading(false));
-    } else if (isLoaded && !isSignedIn) {
-        setIsLoading(false);
     }
-  }, [clerkUser, isLoaded, isSignedIn, router]);
+  }, [currentUser, authLoading, router]);
 
   const handleMarkAsRead = async (id: string) => {
-    if (!isSignedIn || !clerkUser) return;
-    const success = await markNotificationAsRead(id, clerkUser.id); 
+    if (!currentUser) return;
+    const success = await markNotificationAsReadInFirestore(id, currentUser.uid); 
     if (success) {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!isSignedIn || !clerkUser) return;
-    const success = await deleteNotification(id, clerkUser.id); 
+    if (!currentUser) return;
+    const success = await deleteNotificationFromFirestore(id, currentUser.uid); 
     if (success) {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }
@@ -115,7 +123,7 @@ export default function NotificationsPage() {
     return Math.floor(seconds) + " seconds ago";
   };
 
-  if (!isLoaded || isLoading) { 
+  if (authLoading || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -124,7 +132,8 @@ export default function NotificationsPage() {
     );
   }
   
-  if (isLoaded && !isSignedIn) {
+  // This redirect should be covered by the useEffect above
+  if (!currentUser && !authLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Button variant="outline" asChild className="mb-6">
@@ -134,7 +143,7 @@ export default function NotificationsPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/sign-in?redirect_url=/notifications" className="underline text-primary">log in</Link> to view your notifications.
+            Please <Link href="/login?redirect_url=/notifications" className="underline text-primary">log in</Link> to view your notifications.
           </AlertDescription>
         </Alert>
       </div>
@@ -211,3 +220,4 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
