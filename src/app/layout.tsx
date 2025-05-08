@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className={GeistSans.className} suppressHydrationWarning>
+      <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <body className={`antialiased`}>
           <Providers>
             <div className="relative flex min-h-screen flex-col">
