@@ -11,13 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Edit, BarChart2, BellRing, UploadCloud, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import { KARNATAKA_DISTRICTS, EVENT_CATEGORIES, LANGUAGE_PREFERENCES, type KarnatakaDistrict, type EventCategory, type LanguagePreference, type Event } from '@/types/event';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser } from '@clerk/nextjs'; // Changed from useAuth
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Import centralized mock data
+import { MOCK_EVENTS_DATA } from '@/lib/mockEvents';
 
 export default function OrganizerDashboardPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk's useUser
   const router = useRouter();
 
   const [eventName, setEventName] = useState('');
@@ -38,17 +38,17 @@ export default function OrganizerDashboardPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [myEvents, setMyEvents] = useState<Event[]>([]);
-  const { toast } = useToast();
+  const { toast } } from '@/hooks/use-toast';
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/dashboard');
-    } else if (currentUser) {
-      // Fetch events created by this currentUser from MOCK_EVENTS_DATA
-      const userEvents = MOCK_EVENTS_DATA.filter(event => event.organizerId === currentUser.id);
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/dashboard'); // Redirect to Clerk's sign-in page
+    } else if (isSignedIn && clerkUser) {
+      // Fetch events created by this clerkUser from MOCK_EVENTS_DATA
+      const userEvents = MOCK_EVENTS_DATA.filter(event => event.organizerId === clerkUser.id);
       setMyEvents(userEvents);
     }
-  }, [currentUser, authLoading, router]);
+  }, [clerkUser, isLoaded, isSignedIn, router]);
 
 
   const handleTargetDistrictToggle = (d: KarnatakaDistrict) => {
@@ -63,14 +63,13 @@ export default function OrganizerDashboardPage() {
         toast({ title: "Missing Fields", description: "Please fill all required fields for the event.", variant: "destructive" });
         return;
     }
-    if (!currentUser) {
+    if (!isSignedIn || !clerkUser) {
         toast({ title: "Not Authenticated", description: "Please log in to create an event.", variant: "destructive" });
-        router.push('/login?redirect=/dashboard');
+        router.push('/sign-in?redirect_url=/dashboard');
         return;
     }
     setIsSubmitting(true);
     
-    // Simulate API call for event creation
     await new Promise(resolve => setTimeout(resolve, 1500)); 
     
     const newEvent: Event = {
@@ -79,7 +78,7 @@ export default function OrganizerDashboardPage() {
         description, date, time, locationName, address,
         district: district as KarnatakaDistrict, 
         city: city, 
-        latitude: 0, longitude: 0, // Placeholder, implement geocoding or manual input
+        latitude: 0, longitude: 0, 
         category: category as EventCategory, language: language as LanguagePreference,
         createdAt: new Date().toISOString(),
         targetDistricts,
@@ -87,17 +86,14 @@ export default function OrganizerDashboardPage() {
         price: typeof price === 'number' ? price : undefined,
         imageUrl: posterEng ? URL.createObjectURL(posterEng) : `https://picsum.photos/seed/${Date.now()}/600/400`,
         posterKaUrl: posterKa ? URL.createObjectURL(posterKa) : undefined,
-        organizerId: currentUser.id,
-        organizerName: currentUser.name || currentUser.email?.split('@')[0] || 'Organizer',
+        organizerId: clerkUser.id,
+        organizerName: clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Organizer',
     };
 
-    // Add to global mock events (MOCK_EVENTS_DATA) for demo purposes
-    // In a real app, this would be an API call to save to a database
     MOCK_EVENTS_DATA.unshift(newEvent); 
-    setMyEvents(prev => [newEvent, ...prev]); // Update local state for dashboard view
+    setMyEvents(prev => [newEvent, ...prev]);
 
     toast({ title: 'Event Created!', description: `${eventName} has been successfully created.` });
-    // Reset form
     setEventName(''); setDescription(''); setDate(''); setTime(''); 
     setLocationName(''); setAddress(''); setDistrict(''); setCity(''); setCategory(''); 
     setLanguage(''); setTargetDistricts([]); setPosterEng(null); setPosterKa(null);
@@ -105,7 +101,7 @@ export default function OrganizerDashboardPage() {
     setIsSubmitting(false);
   };
 
-  if (authLoading || !currentUser) {
+  if (!isLoaded || !isSignedIn) { // Show loader until Clerk status is known or if not signed in
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

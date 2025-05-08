@@ -9,76 +9,78 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Edit3, UserCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, Edit3, UserCircle, ArrowLeft, LogOut } from 'lucide-react';
 import { KARNATAKA_DISTRICTS, KARNATAKA_CITIES, LANGUAGE_PREFERENCES, USER_INTERESTS, type User, type KarnatakaDistrict, type KarnatakaCity, type LanguagePreference, type UserInterest } from '@/types/event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Mock data storage for user profiles (replace with backend in real app)
-let MOCK_USER_PROFILES: Record<string, User> = {};
+// Mock data storage for user profiles (app-specific details)
+// In a real app, this would be your backend database linked to Clerk user IDs.
+let MOCK_APP_USER_DETAILS: Record<string, Partial<User>> = {};
 
 
 export default function ProfilePage() {
-  const { currentUser, loading: authLoading, logout, updateUserProfile: authUpdateUserProfile } = useAuth();
+  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
   
-  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [appUserDetails, setAppUserDetails] = useState<Partial<User> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // For app-specific details loading
   const { toast } = useToast();
 
-  // Form state
-  const [name, setName] = useState('');
+  // Form state for app-specific fields
+  const [name, setName] = useState(''); // Clerk provides fullName, this can be for overriding or if not available
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | 'Prefer not to say' | ''>('');
   const [dob, setDob] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(''); // Clerk can manage phone, this could be separate
   const [district, setDistrict] = useState<KarnatakaDistrict | ''>('');
-  const [city, setCity] = useState<KarnatakaCity | 'Other' | ''>(''); // Allow 'Other'
+  const [city, setCity] = useState<KarnatakaCity | 'Other' | ''>('');
   const [customCity, setCustomCity] = useState('');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference | ''>('');
   const [collegeOrInstitution, setCollegeOrInstitution] = useState('');
   const [interests, setInterests] = useState<UserInterest[]>([]);
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/profile');
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/profile'); // Clerk handles /sign-in
       return;
     }
 
-    if (currentUser && !userProfile) { 
-      const fetchUserProfile = async () => {
-        setIsLoadingProfile(true);
-        // Simulate fetching profile from our mock store or use currentUser directly
-        let profileData = MOCK_USER_PROFILES[currentUser.id] || currentUser;
-        
-        // If not in mock store, add it (could happen if user logged in via OTP without prior full registration)
-        if (!MOCK_USER_PROFILES[currentUser.id]) {
-            MOCK_USER_PROFILES[currentUser.id] = profileData;
-        }
+    if (isLoaded && isSignedIn && clerkUser) {
+      setIsLoadingProfile(true);
+      // Fetch or initialize app-specific details from our mock store
+      let userDetails = MOCK_APP_USER_DETAILS[clerkUser.id];
+      
+      if (!userDetails) {
+        // Initialize with some defaults if not found in mock store
+        userDetails = {
+          languagePreference: 'English', // Default
+          // Other fields can be initialized as empty or from Clerk if applicable
+        };
+        MOCK_APP_USER_DETAILS[clerkUser.id] = userDetails;
+      }
 
-        setUserProfile(profileData);
-        
-        // Initialize form fields
-        setName(profileData.name || ''); // currentUser.name is from AuthContext
-        setGender(profileData.gender || '');
-        setDob(profileData.dob || '');
-        setPhoneNumber(profileData.phoneNumber || '');
-        setDistrict(profileData.district || '');
-        setCity(profileData.customCity ? 'Other' : (profileData.city as KarnatakaCity | 'Other' | '') || '');
-        setCustomCity(profileData.customCity || '');
-        setLanguagePreference(profileData.languagePreference || 'English');
-        setCollegeOrInstitution(profileData.collegeOrInstitution || '');
-        setInterests(profileData.interests || []);
-        setIsLoadingProfile(false);
-      };
-      fetchUserProfile();
-    } else if (!currentUser && !authLoading) { 
-        setIsLoadingProfile(false);
+      setAppUserDetails(userDetails);
+      
+      // Initialize form fields
+      setName(clerkUser.fullName || userDetails.name || '');
+      setGender(userDetails.gender || '');
+      setDob(userDetails.dob || '');
+      // Clerk's phone might be clerkUser.phoneNumbers[0]?.phoneNumber
+      setPhoneNumber(userDetails.phoneNumber || ''); 
+      setDistrict(userDetails.district || '');
+      setCity(userDetails.customCity ? 'Other' : (userDetails.city as KarnatakaCity | 'Other' | '') || '');
+      setCustomCity(userDetails.customCity || '');
+      setLanguagePreference(userDetails.languagePreference || 'English');
+      setCollegeOrInstitution(userDetails.collegeOrInstitution || '');
+      setInterests(userDetails.interests || []);
+      setIsLoadingProfile(false);
     }
-  }, [currentUser, authLoading, router, userProfile]);
+  }, [isLoaded, isSignedIn, clerkUser, router]);
 
 
   const handleInterestChange = (interest: UserInterest) => {
@@ -89,7 +91,7 @@ export default function ProfilePage() {
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userProfile || !currentUser) return;
+    if (!appUserDetails || !clerkUser) return;
     if (!name || !district || !languagePreference) {
         toast({ title: "Missing Required Fields", description: "Name, District, and Language Preference are required.", variant: "destructive"});
         return;
@@ -99,12 +101,10 @@ export default function ProfilePage() {
         return;
     }
 
-
     setIsSaving(true);
     
-    const updatedUserData: User = {
-      ...userProfile, // Keep existing fields like id, email, createdAt
-      name,
+    const updatedAppSpecificData: Partial<User> = {
+      name, // This might update Clerk's name too if desired via Clerk SDK
       gender: gender || undefined,
       dob: dob || undefined,
       phoneNumber: phoneNumber || undefined,
@@ -114,25 +114,29 @@ export default function ProfilePage() {
       languagePreference: languagePreference as LanguagePreference,
       collegeOrInstitution: collegeOrInstitution || undefined,
       interests: interests.length > 0 ? interests : undefined,
-      // photoURL from Auth context might be from Google, etc. Retain it.
-      photoURL: currentUser.photoURL || userProfile.photoURL, 
     };
 
     // Simulate saving to backend/mock store
     await new Promise(resolve => setTimeout(resolve, 1000));
-    MOCK_USER_PROFILES[currentUser.id] = updatedUserData;
-    setUserProfile(updatedUserData); 
-    // Update user in AuthContext and localStorage
-    authUpdateUserProfile(updatedUserData);
+    MOCK_APP_USER_DETAILS[clerkUser.id] = { ...MOCK_APP_USER_DETAILS[clerkUser.id], ...updatedAppSpecificData };
+    setAppUserDetails(prev => ({...prev, ...updatedAppSpecificData})); 
     
+    // If you want to update Clerk's user attributes (e.g. name, publicMetadata for interests)
+    // you would use clerkUser.update() here.
+    // Example: await clerkUser.update({ fullName: name, publicMetadata: { interests: interests } });
+
     toast({ title: 'Profile Updated!', description: 'Your profile information has been saved.' });
     setIsSaving(false);
     setIsEditing(false);
   };
   
-  if (authLoading || isLoadingProfile || !userProfile) { 
+  if (!isLoaded || isLoadingProfile || !clerkUser) { 
     return <div className="container mx-auto flex min-h-[calc(100vh-10rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
+
+  const displayEmail = clerkUser.primaryEmailAddress?.emailAddress || 'No email';
+  const displayName = name || clerkUser.fullName || 'User Profile';
+  const displayPhotoUrl = clerkUser.imageUrl || appUserDetails?.photoURL;
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-8">
@@ -144,14 +148,14 @@ export default function ProfilePage() {
       <Card className="shadow-xl rounded-lg">
         <CardHeader className="text-center relative p-6">
           <Avatar className="mx-auto h-24 w-24 mb-4 border-2 border-primary">
-            <AvatarImage src={userProfile.photoURL || `https://picsum.photos/seed/${userProfile.id}/200/200`} alt={userProfile.name || 'User'} data-ai-hint="profile large person"/>
-            <AvatarFallback className="text-3xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : <UserCircle className="h-12 w-12" />}</AvatarFallback>
+            <AvatarImage src={displayPhotoUrl || `https://picsum.photos/seed/${clerkUser.id}/200/200`} alt={displayName} data-ai-hint="profile large person"/>
+            <AvatarFallback className="text-3xl">{displayName ? displayName.charAt(0).toUpperCase() : <UserCircle className="h-12 w-12" />}</AvatarFallback>
           </Avatar>
-          <CardTitle className="text-2xl font-bold">{userProfile.name || 'User Profile'}</CardTitle>
-          <CardDescription>{userProfile.email}</CardDescription>
+          <CardTitle className="text-2xl font-bold">{displayName}</CardTitle>
+          <CardDescription>{displayEmail}</CardDescription>
           {!isEditing && (
             <Button variant="outline" size="sm" className="absolute top-4 right-4" onClick={() => setIsEditing(true)} disabled={isSaving}>
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+              <Edit3 className="mr-2 h-4 w-4" /> Edit App Details
             </Button>
           )}
         </CardHeader>
@@ -159,7 +163,7 @@ export default function ProfilePage() {
           {isEditing ? (
             <form onSubmit={handleSaveChanges} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label htmlFor="edit-name">Full Name *</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
+                <div><Label htmlFor="edit-name">Full Name * (App Specific)</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
                 <div>
                   <Label htmlFor="edit-gender">Gender</Label>
                   <Select value={gender} onValueChange={v => setGender(v as any)} disabled={isSaving}>
@@ -185,7 +189,7 @@ export default function ProfilePage() {
                   <Select value={city} onValueChange={v => setCity(v as KarnatakaCity | 'Other')} disabled={isSaving || !district}>
                     <SelectTrigger><SelectValue placeholder="Select city/town" /></SelectTrigger>
                     <SelectContent>
-                        {KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {KARNATAKA_CITIES.map(c => <SelectItem key={`city-profile-${c}`} value={c}>{c}</SelectItem>)}
                         <SelectItem key="city-profile-other" value="Other">Other (Please specify)</SelectItem>
                     </SelectContent>
                   </Select>
@@ -222,19 +226,20 @@ export default function ProfilePage() {
             </form>
           ) : (
             <div className="space-y-4 text-sm">
-              <ProfileDetail label="Full Name" value={userProfile.name} />
-              <ProfileDetail label="Email ID" value={userProfile.email} />
-              <ProfileDetail label="Gender" value={userProfile.gender} />
-              <ProfileDetail label="Date of Birth" value={userProfile.dob ? new Date(userProfile.dob).toLocaleDateString('en-IN') : undefined} />
-              <ProfileDetail label="Phone Number" value={userProfile.phoneNumber} />
-              <ProfileDetail label="District" value={userProfile.district} />
-              <ProfileDetail label="City/Town" value={userProfile.customCity || userProfile.city} />
-              <ProfileDetail label="Language Preference" value={userProfile.languagePreference} />
-              <ProfileDetail label="College/Institution" value={userProfile.collegeOrInstitution} />
-              <ProfileDetail label="Interests" value={userProfile.interests?.join(', ')} />
-              <ProfileDetail label="Member Since" value={new Date(userProfile.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })} />
-              <Button variant="destructive" onClick={logout} className="w-full mt-6" disabled={isSaving}>
-                Log Out
+              <ProfileDetail label="Full Name (from Clerk)" value={clerkUser.fullName || 'N/A'} />
+              <ProfileDetail label="Email ID" value={displayEmail} />
+              <ProfileDetail label="App-specific Name" value={name} />
+              <ProfileDetail label="Gender" value={gender} />
+              <ProfileDetail label="Date of Birth" value={dob ? new Date(dob).toLocaleDateString('en-IN') : undefined} />
+              <ProfileDetail label="Phone Number" value={phoneNumber} />
+              <ProfileDetail label="District" value={district} />
+              <ProfileDetail label="City/Town" value={customCity || city} />
+              <ProfileDetail label="Language Preference" value={languagePreference} />
+              <ProfileDetail label="College/Institution" value={collegeOrInstitution} />
+              <ProfileDetail label="Interests" value={interests?.join(', ')} />
+              <ProfileDetail label="Member Since" value={clerkUser.createdAt ? new Date(clerkUser.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' }) : 'N/A'} />
+              <Button variant="destructive" onClick={() => signOut(() => router.push('/'))} className="w-full mt-6" disabled={isSaving}>
+                <LogOut className="mr-2 h-4 w-4" /> Log Out
               </Button>
             </div>
           )}
@@ -244,8 +249,8 @@ export default function ProfilePage() {
   );
 }
 
-function ProfileDetail({ label, value }: { label: string, value?: string }) {
-  if (value === undefined || value === null || value.trim() === '') return null;
+function ProfileDetail({ label, value }: { label: string, value?: string | null }) {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return null;
   return (
     <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b pb-3 pt-1">
       <span className="font-medium text-muted-foreground mb-1 sm:mb-0">{label}:</span>

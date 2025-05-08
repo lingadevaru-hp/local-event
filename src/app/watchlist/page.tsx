@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListChecks, Info, Loader2, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser from '@clerk/nextjs'; // Changed from useAuth
 import { useRouter } from 'next/navigation';
-import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Import centralized mock data
+import { MOCK_EVENTS_DATA from '@/lib/mockEvents'; 
 
 async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
   console.log('Fetching watchlist for user:', userId);
@@ -20,9 +20,8 @@ async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
   if (typeof window !== 'undefined') {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      // Key format: watchlist_EVENTID_USERID
       if (key && key.startsWith('watchlist_') && key.endsWith(`_${userId}`) && localStorage.getItem(key) === 'true') {
-        const eventId = key.split('_')[1]; // Extract event ID
+        const eventId = key.split('_')[1]; 
         if (eventId) {
           watchlistEventIds.push(eventId);
         }
@@ -34,31 +33,31 @@ async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
 
 
 export default function WatchlistPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
   const router = useRouter();
 
   const [watchlistEvents, setWatchlistEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true); // For watchlist data fetching
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/watchlist'); // Redirect to login if not authenticated
-    } else if (currentUser) {
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/watchlist'); 
+    } else if (isSignedIn && clerkUser) {
       setIsLoading(true);
-      fetchWatchlistEvents(currentUser.id) // Pass current user's ID
+      fetchWatchlistEvents(clerkUser.id) 
         .then(setWatchlistEvents)
         .catch(err => {
           console.error("Failed to load watchlist:", err);
           setError("Could not load your watchlist. Please try again later.");
         })
         .finally(() => setIsLoading(false));
-    } else if (!authLoading && !currentUser) { // Handle case where auth is done loading but no user
-        setIsLoading(false); // Stop loading as there's no user to fetch for
+    } else if (isLoaded && !isSignedIn) {
+        setIsLoading(false); 
     }
-  }, [currentUser, authLoading, router]);
+  }, [clerkUser, isLoaded, isSignedIn, router]);
 
-  if (isLoading || authLoading) { 
+  if (!isLoaded || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -67,7 +66,7 @@ export default function WatchlistPage() {
     );
   }
 
-  if (!currentUser && !authLoading) { // If loading is complete and still no user
+  if (isLoaded && !isSignedIn) { 
     return (
       <div className="container mx-auto px-4 py-8">
          <Button variant="outline" asChild className="mb-6">
@@ -77,7 +76,7 @@ export default function WatchlistPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/login?redirect=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
+            Please <Link href="/sign-in?redirect_url=/watchlist" className="underline text-primary">log in</Link> to view your watchlist.
           </AlertDescription>
         </Alert>
       </div>

@@ -9,12 +9,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import type { WatchListNotification } from '@/types/event';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser } from '@clerk/nextjs'; // Changed from useAuth
 import { useRouter } from 'next/navigation';
 
 const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
   { 
-    id: 'notif1', userId: 'mockUserId123', eventId: '1', // Example userId
+    id: 'notif1', userId: 'mockUserId123', eventId: '1', 
     message: 'Kala Utsava Bengaluru is starting in 3 days!', 
     type: 'DATE_NEAR', createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), isRead: false 
   },
@@ -24,18 +24,18 @@ const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
     type: 'PRICE_REDUCED', createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), isRead: false
   },
     { 
-    id: 'notif3', userId: 'anotherUser456', eventId: '2', 
+    id: 'notif3', userId: 'clerk_user_id_placeholder', eventId: '2', // Example Clerk user ID
     message: 'Mysuru Dasara Tech Hackathon has new updates!', 
     type: 'LOCATION_UPDATED', createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString(), isRead: true
   },
 ];
 
-// Mutable copy for simulation
 let mockNotificationsData = [...MOCK_NOTIFICATIONS_STORE];
 
 async function fetchNotifications(userId: string): Promise<WatchListNotification[]> {
   console.log('Fetching notifications for user:', userId);
   await new Promise(resolve => setTimeout(resolve, 700));
+  // Filter notifications by Clerk user ID
   return mockNotificationsData.filter(n => n.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
@@ -60,41 +60,41 @@ async function deleteNotification(notificationId: string, userId: string): Promi
 
 
 export default function NotificationsPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<WatchListNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // For notifications fetching
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/notifications');
-    } else if (currentUser) {
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect_url=/notifications');
+    } else if (isSignedIn && clerkUser) {
       setIsLoading(true);
-      fetchNotifications(currentUser.id) // Use currentUser.id (from AppUser)
+      fetchNotifications(clerkUser.id) 
         .then(setNotifications)
         .catch(err => {
           console.error("Failed to load notifications:", err);
           setError("Could not load your notifications. Please try again later.");
         })
         .finally(() => setIsLoading(false));
-    } else if (!authLoading && !currentUser) {
+    } else if (isLoaded && !isSignedIn) {
         setIsLoading(false);
     }
-  }, [currentUser, authLoading, router]);
+  }, [clerkUser, isLoaded, isSignedIn, router]);
 
   const handleMarkAsRead = async (id: string) => {
-    if (!currentUser) return;
-    const success = await markNotificationAsRead(id, currentUser.id); // Use currentUser.id
+    if (!isSignedIn || !clerkUser) return;
+    const success = await markNotificationAsRead(id, clerkUser.id); 
     if (success) {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!currentUser) return;
-    const success = await deleteNotification(id, currentUser.id); // Use currentUser.id
+    if (!isSignedIn || !clerkUser) return;
+    const success = await deleteNotification(id, clerkUser.id); 
     if (success) {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }
@@ -116,7 +116,7 @@ export default function NotificationsPage() {
     return Math.floor(seconds) + " seconds ago";
   };
 
-  if (isLoading || authLoading) {
+  if (!isLoaded || isLoading) { // Show loader if Clerk is loading or notifications are loading
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -125,7 +125,7 @@ export default function NotificationsPage() {
     );
   }
   
-  if (!currentUser && !authLoading) {
+  if (isLoaded && !isSignedIn) { // If Clerk loaded and user is not signed in
     return (
       <div className="container mx-auto px-4 py-8">
         <Button variant="outline" asChild className="mb-6">
@@ -135,7 +135,7 @@ export default function NotificationsPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Login Required</AlertTitle>
           <AlertDescription>
-            Please <Link href="/login?redirect=/notifications" className="underline text-primary">log in</Link> to view your notifications.
+            Please <Link href="/sign-in?redirect_url=/notifications" className="underline text-primary">log in</Link> to view your notifications.
           </AlertDescription>
         </Alert>
       </div>

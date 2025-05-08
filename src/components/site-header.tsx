@@ -12,21 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogIn, LogOut, UserPlus, Bell, ListChecks, UserCircle, Settings, Briefcase, Sun, Moon } from 'lucide-react'; 
+import { Bell, ListChecks, UserCircle, Settings, Briefcase } from 'lucide-react'; 
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
-import { useAuth } from '@/contexts/auth-context'; 
-import { useTheme } from 'next-themes';
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs'; // For getting user info if needed directly
 
 export function SiteHeader() {
-  const { currentUser, logout, loading, loginWithGoogle } = useAuth(); 
-  const { theme } = useTheme();
-
-  const handleGoogleLogin = async () => {
-    if (loginWithGoogle) {
-      const { success, message, user } = await loginWithGoogle();
-      // Toast can be handled within loginWithGoogle or here based on `success` and `message`
-    }
-  };
+  const { user } = useUser();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,78 +32,41 @@ export function SiteHeader() {
         <div className="flex items-center space-x-2 sm:space-x-4">
           <ThemeToggleButton />
           <nav className="flex items-center space-x-1">
-            {loading && !currentUser ? null : currentUser ? ( 
-              <>
-                <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex">
-                  <Link href="/watchlist" aria-label="Watchlist">
-                    <ListChecks className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex">
-                  <Link href="/notifications" aria-label="Notifications">
-                     <Bell className="h-5 w-5" />
-                  </Link>
-                </Button>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.name || 'User'} data-ai-hint="profile person" />
-                        <AvatarFallback>{currentUser.name ? currentUser.name.charAt(0).toUpperCase() : <UserCircle className="h-5 w-5"/>}</AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{currentUser.name || 'User'}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {currentUser.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                       <Link href="/profile"><Settings className="mr-2 h-4 w-4" />My Profile</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                       <Link href="/dashboard"><Briefcase className="mr-2 h-4 w-4" />Organizer Dashboard</Link>
-                    </DropdownMenuItem>
-                     <DropdownMenuItem asChild className="sm:hidden">
-                       <Link href="/watchlist"><ListChecks className="mr-2 h-4 w-4" />Watchlist</Link>
-                    </DropdownMenuItem>
-                     <DropdownMenuItem asChild className="sm:hidden">
-                       <Link href="/notifications"><Bell className="mr-2 h-4 w-4" />Notifications</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            ) : (
-              <>
-                <Button onClick={handleGoogleLogin} variant="outline" disabled={loading} className="hidden sm:inline-flex">
-                  <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                    <path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.3 512 0 401.7 0 265.5S110.3 19 244 19c70.8 0 133.2 29.4 178.5 76.3L380.5 137C345.8 106.9 299.6 85 244 85c-97.3 0-175.5 78.2-175.5 174.5S146.7 434 244 434c81.8 0 150.9-59.7 170.3-139.1H244v-73.1h236.3c1.6 10.7 2.5 21.8 2.5 33z"></path>
-                  </svg>
-                  Sign in with Google
-                </Button>
-                <Button asChild variant="ghost" disabled={loading}>
-                  <Link href="/login">
-                    <LogIn className="mr-2 h-4 w-4" /> Login
-                  </Link>
-                </Button>
-                <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>
-                  <Link href="/register">
-                    <UserPlus className="mr-2 h-4 w-4" /> Register
-                  </Link>
-                </Button>
-              </>
-            )}
+            <SignedIn>
+              <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex">
+                <Link href="/watchlist" aria-label="Watchlist">
+                  <ListChecks className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex">
+                <Link href="/notifications" aria-label="Notifications">
+                    <Bell className="h-5 w-5" />
+                </Link>
+              </Button>
+              <UserButton afterSignOutUrl="/">
+                {/* UserButton has built-in links to profile, manage account etc. Add custom ones if needed */}
+                <UserButton.UserProfileLink label="My Profile" url="/profile" />
+                <UserButton.UserProfilePage label="Manage Account" url="/user" />
+                {/* Example of custom item if UserButton allows children like this, check Clerk docs */}
+                {/* <DropdownMenuItem asChild> is not how UserButton works for custom items, 
+                    It's typically through `userProfileProps` or specific named slots if available.
+                    For this example, we rely on standard UserButton links. 
+                    Custom navigation items for dashboard can be separate buttons or links as below.
+                */}
+              </UserButton>
+              {/* Separate link for dashboard for clarity for now */}
+               <Button variant="ghost" size="sm" asChild className="ml-2">
+                  <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="ghost">Login</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Register</Button>
+              </SignUpButton>
+            </SignedOut>
           </nav>
         </div>
       </div>

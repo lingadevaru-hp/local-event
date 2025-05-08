@@ -1,8 +1,8 @@
 
 'use client';
-import type React from 'react'; // Import React for React.use()
-import { useEffect, useState, use } from 'react'; // Added use
-import type { Event, Rating as RatingType } from '@/types/event';
+import type React from 'react'; 
+import { useEffect, useState, use } from 'react'; 
+import type { Event, Rating as RatingType, User as AppUser } from '@/types/event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +13,10 @@ import { CalendarDays, MapPin, Star, Tag, User as UserIcon, Send, Loader2, Langu
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser } from '@clerk/nextjs'; // Changed from useAuth
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Import mock events
+import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
 
 async function fetchEventById(id: string): Promise<Event | null> {
   console.log("Fetching event by ID:", id);
@@ -30,29 +30,26 @@ async function fetchEventById(id: string): Promise<Event | null> {
   });
 }
 
-// Mock submitting a review
-async function submitReview(eventId: string, rating: number, reviewText: string, user: { id: string, name?: string, email?: string, photoURL?: string } | null): Promise<RatingType> {
+async function submitReview(eventId: string, rating: number, reviewText: string, clerkUser: ReturnType<typeof useUser>['user']): Promise<RatingType> {
    console.log("Submitting review for event:", eventId, "Rating:", rating, "Review:", reviewText);
    return new Promise(resolve => {
     setTimeout(() => {
       const newReview: RatingType = {
         id: `r${Date.now()}`,
-        userId: user?.id || 'anonymousUser', 
+        userId: clerkUser?.id || 'anonymousUser', 
         eventId,
         rating,
         reviewText,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         user: { 
-            id: user?.id || 'anonymousUser', 
-            username: user?.email?.split('@')[0] || 'Anonymous', 
-            name: user?.name || 'Anonymous User',
-            photoURL: user?.photoURL || undefined,
+            id: clerkUser?.id || 'anonymousUser', 
+            username: clerkUser?.username || clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Anonymous', 
+            name: clerkUser?.fullName || 'Anonymous User',
+            photoURL: clerkUser?.imageUrl || undefined,
             languagePreference: 'English', 
-            // createdAt: new Date().toISOString() // Removed as it's not part of Partial<User> from Rating
         }
       };
-      // Add review to mock data (for session persistence of review)
       const eventIndex = MOCK_EVENTS_DATA.findIndex(e => e.id === eventId);
       if (eventIndex > -1) {
         const existingRatings = MOCK_EVENTS_DATA[eventIndex].ratings || [];
@@ -70,15 +67,12 @@ async function submitReview(eventId: string, rating: number, reviewText: string,
   });
 }
 
-// Mock event signup
 async function signUpForEvent(eventId: string, userId: string): Promise<{ success: boolean; message: string }> {
     console.log(`User ${userId} signing up for event ${eventId}`);
     return new Promise(resolve => {
         setTimeout(() => {
-            // Simulate success/failure
-            const success = Math.random() > 0.1; // 90% success rate
+            const success = Math.random() > 0.1; 
             if (success) {
-                // In a real app, store this signup relation in a database
                 console.log(`User ${userId} successfully signed up for event ${eventId}`);
                 resolve({ success: true, message: "Successfully signed up for the event!" });
             } else {
@@ -94,11 +88,11 @@ interface EventPageProps {
 }
 
 export default function EventPage({ params: paramsProp }: EventPageProps) {
-  const params = use(paramsProp); // Unwrap params using React.use()
-  const { currentUser, loading: authLoading } = useAuth();
+  const params = use(paramsProp); 
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // For event data fetching
   const [error, setError] = useState<string | null>(null);
   
   const [userRating, setUserRating] = useState(0);
@@ -114,20 +108,20 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     const eventId = params.id;
     if (eventId) {
       setIsLoading(true);
-      setError(null); // Reset error on new ID
+      setError(null); 
       fetchEventById(eventId)
         .then(data => {
           if (data) {
             setEvent(data);
-            if (currentUser && data.ratings) {
-              const existingReview = data.ratings.find(r => r.userId === currentUser.id);
+            if (isSignedIn && clerkUser && data.ratings) {
+              const existingReview = data.ratings.find(r => r.userId === clerkUser.id);
               if (existingReview) {
                 setUserRating(existingReview.rating);
                 setUserReviewText(existingReview.reviewText || '');
               }
             }
             if (typeof window !== 'undefined') {
-                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${currentUser?.id || 'guest'}`) === 'true');
+                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${clerkUser?.id || 'guest'}`) === 'true');
             }
           } else {
             setError('Event not found.');
@@ -136,12 +130,12 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
         .catch(() => setError('Failed to load event details.'))
         .finally(() => setIsLoading(false));
     }
-  }, [params.id, currentUser]);
+  }, [params.id, clerkUser, isSignedIn]);
 
   const handleRatingSubmit = async () => {
-    if (!currentUser) {
+    if (!isSignedIn || !clerkUser) {
       toast({ title: "Login Required", description: "Please log in to submit a review.", variant: "destructive" });
-      router.push(`/login?redirect=/events/${params.id}`);
+      router.push(`/sign-in?redirect_url=/events/${params.id}`); // Use Clerk's sign-in
       return;
     }
     if (userRating === 0) {
@@ -150,10 +144,10 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     }
     setIsSubmittingReview(true);
     try {
-      const newReview = await submitReview(params.id, userRating, userReviewText, currentUser);
+      const newReview = await submitReview(params.id, userRating, userReviewText, clerkUser);
       setEvent(prevEvent => {
         if (!prevEvent) return null;
-        const otherReviews = prevEvent.ratings?.filter(r => r.userId !== currentUser.id) || [];
+        const otherReviews = prevEvent.ratings?.filter(r => r.userId !== clerkUser.id) || [];
         const updatedRatings = [...otherReviews, newReview];
         const totalRatingSum = updatedRatings.reduce((sum, r) => sum + r.rating, 0);
         const newAverageRating = updatedRatings.length > 0 ? totalRatingSum / updatedRatings.length : 0;
@@ -169,13 +163,13 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   };
 
   const handleEventSignUp = async () => {
-    if (!currentUser) {
+    if (!isSignedIn || !clerkUser) {
         toast({ title: "Login Required", description: "Please log in to sign up for this event.", variant: "destructive" });
-        router.push(`/login?redirect=/events/${params.id}`);
+        router.push(`/sign-in?redirect_url=/events/${params.id}`);
         return;
     }
     setIsSigningUp(true);
-    const result = await signUpForEvent(params.id, currentUser.id);
+    const result = await signUpForEvent(params.id, clerkUser.id);
     if (result.success) {
         toast({ title: "Event Signup Successful", description: result.message });
     } else {
@@ -185,15 +179,15 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   };
 
   const handleToggleWatchlist = async () => {
-    if (!currentUser) {
+    if (!isSignedIn || !clerkUser) {
       toast({ title: "Login Required", description: "Please log in to manage your watchlist.", variant: "destructive" });
-      router.push(`/login?redirect=/events/${params.id}`);
+      router.push(`/sign-in?redirect_url=/events/${params.id}`);
       return;
     }
     setIsWatchlistLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); 
     const newWatchlistStatus = !isInWatchlist;
-    const watchlistItemKey = `watchlist_${params.id}_${currentUser.id}`; // Use current user's ID
+    const watchlistItemKey = `watchlist_${params.id}_${clerkUser.id}`; 
     setIsInWatchlist(newWatchlistStatus);
     if (typeof window !== 'undefined') {
         if (newWatchlistStatus) {
@@ -207,7 +201,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     setIsWatchlistLoading(false);
   };
 
-  if (isLoading || authLoading) {
+  if (!isLoaded || isLoading) { // Loading if Clerk is not loaded OR event data is loading
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -293,7 +287,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                     {isSigningUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ticket className="mr-2 h-4 w-4" />}
                     Sign Up for Event
                 </Button>
-                {currentUser && (
+                {isSignedIn && (
                     <Button onClick={handleToggleWatchlist} disabled={isWatchlistLoading} variant={isInWatchlist ? "secondary" : "outline"} className="w-full sm:w-auto">
                     {isWatchlistLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isInWatchlist ? <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> : <Heart className="mr-2 h-4 w-4" />)}
                     {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -313,10 +307,10 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
 
             <section>
               <h2 className="text-2xl font-semibold mb-4 text-primary">Reviews & Ratings</h2>
-              {currentUser ? (
+              {isSignedIn && clerkUser ? (
                 <div className="mb-6 p-4 border rounded-lg bg-secondary/30">
                   <h3 className="text-lg font-medium mb-2">
-                    {event.ratings?.find(r => r.userId === currentUser.id) ? 'Update Your Review' : 'Leave a Review'}
+                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Your Review' : 'Leave a Review'}
                   </h3>
                   <div className="flex items-center mb-3 space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -327,14 +321,14 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                   <Textarea placeholder="Share your experience..." value={userReviewText} onChange={(e) => setUserReviewText(e.target.value)} className="mb-3 min-h-[100px]" aria-label="Your review text" />
                   <Button onClick={handleRatingSubmit} disabled={isSubmittingReview || userRating === 0} className="bg-accent text-accent-foreground hover:bg-accent/90">
                     {isSubmittingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                    {event.ratings?.find(r => r.userId === currentUser.id) ? 'Update Review' : 'Submit Review'}
+                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Review' : 'Submit Review'}
                   </Button>
                 </div>
               ) : (
                 <Alert>
                   <Star className="h-4 w-4" />
                   <AlertDescription>
-                    <Link href={`/login?redirect=/events/${params.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review or sign up for this event.
+                    <Link href={`/sign-in?redirect_url=/events/${params.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review or sign up for this event.
                   </AlertDescription>
                 </Alert>
               )}
@@ -365,7 +359,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                   ))}
                 </div>
               ) : (
-                !currentUser && event.ratings?.length === 0 ? null : <p className="text-muted-foreground mt-4">No reviews yet. Be the first to leave one!</p>
+                !isSignedIn && event.ratings?.length === 0 ? null : <p className="text-muted-foreground mt-4">No reviews yet. Be the first to leave one!</p>
               )}
             </section>
           </div>
