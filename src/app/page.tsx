@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -7,12 +6,13 @@ import { FeaturedEventsCarousel } from '@/components/featured-events-carousel';
 import { useUser, SignInButton, SignUpButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Loader2, LogIn, UserPlus, WifiOff, SearchX } from 'lucide-react'; // Added WifiOff, SearchX
+import { Loader2, LogIn, UserPlus, WifiOff, SearchX, ServerCrash } from 'lucide-react';
 import type { Event as EventType } from '@/types/event';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { EventCard } from '@/components/event-card';
-import { Skeleton } from '@/components/ui/skeleton'; // For skeleton loaders
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 const headlineVariants = {
@@ -31,7 +31,7 @@ const buttonVariants = {
 };
 
 const EventCardSkeleton = () => (
-  <div className="bg-card/50 backdrop-blur-sm border border-border/20 rounded-xl shadow-lg overflow-hidden p-4 glassmorphism">
+  <div className="bg-card/50 backdrop-blur-sm border border-border/20 rounded-xl shadow-lg overflow-hidden p-4 glassmorphism animate-pulse">
     <Skeleton className="h-40 w-full rounded-md mb-4 bg-muted/30" />
     <Skeleton className="h-6 w-3/4 bg-muted/30 rounded-md mb-2" />
     <Skeleton className="h-4 w-1/2 bg-muted/30 rounded-md" />
@@ -40,7 +40,7 @@ const EventCardSkeleton = () => (
 
 
 export default function HomePage() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded: isClerkLoaded } = useUser();
   const [recentEvents, setRecentEvents] = useState<EventType[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [eventError, setEventError] = useState<string | null>(null);
@@ -49,10 +49,14 @@ export default function HomePage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsOnline(navigator.onLine);
-      const handleOnline = () => setIsOnline(true);
+      const handleOnline = () => {
+        setIsOnline(true);
+        setEventError(null); // Clear previous offline error
+        // Optionally re-fetch data if coming back online
+      };
       const handleOffline = () => {
         setIsOnline(false);
-        setEventError("You are offline. Please check your internet connection to view events.");
+        setEventError("You are offline. Please check your internet connection.");
         setIsLoadingEvents(false); 
       };
       window.addEventListener('online', handleOnline);
@@ -65,26 +69,27 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!isOnline || !firestore) {
+    if (!isOnline) {
+      // Error is already set by the online/offline listener
       setIsLoadingEvents(false);
-      if (!isOnline) {
-        // Error already set by online/offline listener
-      } else {
-         setEventError("Database service is currently unavailable. Please try again later.");
-      }
-      console.warn("Firestore not available or offline for recent events.");
       return;
+    }
+    if (!firestore) {
+       setEventError("Database service is currently unavailable. Please try again later.");
+       setIsLoadingEvents(false);
+       console.warn("Firestore not available for recent events fetch.");
+       return;
     }
 
     setIsLoadingEvents(true);
     setEventError(null);
+    console.log("Attempting to fetch recent events...");
 
     const eventsCollectionRef = collection(firestore, 'events');
-    // Ensure Firestore indexes are set up for orderBy queries for optimal performance.
-    // Consider adding pagination for very large datasets if performance becomes an issue.
     const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(6)); 
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log("Recent events snapshot received:", querySnapshot.size, "documents");
       const eventsData: EventType[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -97,8 +102,8 @@ export default function HomePage() {
         } as EventType);
       });
       setRecentEvents(eventsData);
+      setEventError(null); // Clear any previous error on successful fetch
       setIsLoadingEvents(false);
-      setEventError(null);
     }, (error) => {
       console.error("Error fetching recent events from Firestore:", error);
       setEventError("Failed to load recent events. Please try again or check your connection.");
@@ -106,124 +111,131 @@ export default function HomePage() {
     });
 
     const loadTimer = setTimeout(() => {
-      if (isLoadingEvents) { // Check if still loading
+      if (isLoadingEvents) {
+        console.warn("Recent events loading timed out.");
         setEventError("Loading events is taking longer than usual. Please ensure you have a stable internet connection.");
-        // Optionally set isLoadingEvents to false to show the error instead of indefinite skeletons
-        // setIsLoadingEvents(false); 
+        // setIsLoadingEvents(false); // Optionally stop showing skeleton if timeout is too long
       }
-    }, 15000); // 15-second timeout for initial load feedback
+    }, 20000); // 20-second timeout
 
     return () => {
+      console.log("Unsubscribing from recent events snapshot.");
       unsubscribe();
       clearTimeout(loadTimer);
     };
   }, [isOnline]); // Re-fetch if online status changes and was previously offline.
 
-  if (!isLoaded) {
+  // Combined initial loading state for Clerk and basic connectivity
+  if (!isClerkLoaded) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Loading Local Pulse...</p>
+        <p className="text-lg text-muted-foreground">Initializing Local Pulse...</p>
       </div>
     );
   }
   
-  if (!isOnline) {
-     return (
-      <div className="container mx-auto px-4 py-16 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <WifiOff className="mx-auto h-20 w-20 text-muted-foreground mb-6" />
-        <h2 className="text-3xl font-semibold mb-3 text-foreground">You are Offline</h2>
-        <p className="text-muted-foreground max-w-md">
-          Please check your internet connection to access Local Pulse events and features.
-        </p>
-      </div>
-    );
-  }
+  const renderHeroSection = () => (
+    <section className="w-full py-16 md:py-24 text-center relative overflow-hidden bg-card/50 glassmorphism-light dark:glassmorphism-dark rounded-xl shadow-xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-30 mix-blend-multiply dark:opacity-50"></div>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.h1
+            className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4 drop-shadow-lg"
+            initial="hidden" animate="visible" variants={headlineVariants}
+        >
+            Discover Local Events in Karnataka
+        </motion.h1>
+        <motion.p
+            className="text-md sm:text-lg text-muted-foreground max-w-lg mx-auto mb-8"
+            initial="hidden" animate="visible" variants={taglineVariants}
+        >
+            {!isSignedIn 
+            ? "Sign in to explore, create, and share events happening near you. Your local pulse, at your fingertips."
+            : "Explore events, manage your watchlist, or create your own!"
+            }
+        </motion.p>
+        {!isSignedIn && (
+            <motion.div 
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            initial="hidden" animate="visible" variants={buttonVariants}
+            >
+            <SignInButton mode="modal">
+                <Button 
+                size="lg" 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl py-3 px-8 text-md shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95 animate-pulse"
+                >
+                <LogIn className="mr-2 h-5 w-5" /> Sign In
+                </Button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+                <Button 
+                variant="outline" 
+                size="lg" 
+                className="text-primary border-primary hover:bg-primary/10 rounded-xl py-3 px-8 text-md shadow-md hover:shadow-lg transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95"
+                >
+                <UserPlus className="mr-2 h-5 w-5" /> Sign Up
+                </Button>
+            </SignUpButton>
+            </motion.div>
+        )}
+        </div>
+    </section>
+  );
 
   return (
-    <div className="flex flex-col items-center w-full">
-      {!isSignedIn ? (
-        <section className="w-full py-20 md:py-32 text-center relative overflow-hidden bg-card/30 glassmorphism">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-50 mix-blend-multiply"></div>
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <motion.h1
-              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-6 drop-shadow-md"
-              initial="hidden"
-              animate="visible"
-              variants={headlineVariants}
-            >
-              Discover Local Events in Karnataka
-            </motion.h1>
-            <motion.p
-              className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto mb-10"
-              initial="hidden"
-              animate="visible"
-              variants={taglineVariants}
-            >
-              Sign in to explore, create, and share events happening near you. Your local pulse, at your fingertips.
-            </motion.p>
-            <motion.div 
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
-              initial="hidden"
-              animate="visible"
-              variants={buttonVariants}
-            >
-              <SignInButton mode="modal">
-                <Button 
-                  size="lg" 
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl py-3.5 px-10 text-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95 animate-pulse"
-                >
-                  <LogIn className="mr-2.5 h-5 w-5" /> Sign In
-                </Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                 <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="text-primary border-primary hover:bg-primary/10 rounded-xl py-3.5 px-10 text-lg shadow-md hover:shadow-lg transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95"
-                >
-                  <UserPlus className="mr-2.5 h-5 w-5" /> Sign Up
-                </Button>
-              </SignUpButton>
-            </motion.div>
-          </div>
+    <div className="flex flex-col items-center w-full py-6 px-2 sm:px-4">
+      {renderHeroSection()}
+
+      <div className="container mx-auto px-0 sm:px-4 mt-10 w-full">
+        <FeaturedEventsCarousel />
+        
+        <section className="my-12">
+          <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary tracking-tight">
+            Recent Events
+          </h2>
+          {!isOnline && eventError && (
+             <Alert variant="destructive" className="my-8">
+              <WifiOff className="h-5 w-5" />
+              <AlertTitle>Offline</AlertTitle>
+              <AlertDescription>{eventError}</AlertDescription>
+            </Alert>
+          )}
+          {isOnline && isLoadingEvents && !eventError && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {[...Array(3)].map((_, i) => <EventCardSkeleton key={i} />)}
+            </div>
+          )}
+          {isOnline && !isLoadingEvents && eventError && (
+            <Alert variant="destructive" className="my-8">
+              <ServerCrash className="h-5 w-5" />
+              <AlertTitle>Error Loading Events</AlertTitle>
+              <AlertDescription>{eventError}</AlertDescription>
+            </Alert>
+          )}
+          {isOnline && !isLoadingEvents && !eventError && recentEvents.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {recentEvents.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+          )}
+          {isOnline && !isLoadingEvents && !eventError && recentEvents.length === 0 && (
+            <Alert className="my-8">
+                <SearchX className="h-5 w-5" />
+                <AlertTitle>No Recent Events</AlertTitle>
+                <AlertDescription>
+                No recent events found.
+                {isSignedIn ? (
+                    <> Be the first to <Link href="/dashboard" className="text-primary hover:underline font-semibold">create one</Link>!</>
+                ) : (
+                    <> <SignInButton mode="modal"><Button variant="link" className="p-0 h-auto text-primary hover:underline font-semibold">Sign in</Button></SignInButton> to create events.</>
+                )}
+                </AlertDescription>
+            </Alert>
+          )}
         </section>
-      ) : (
-        <div className="container mx-auto px-0 sm:px-4 py-8 w-full">
-          <FeaturedEventsCarousel />
-          <section className="my-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary tracking-tight">
-              Recent Events
-            </h2>
-            {isLoadingEvents && !eventError && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {[...Array(3)].map((_, i) => <EventCardSkeleton key={i} />)}
-              </div>
-            )}
-            {!isLoadingEvents && eventError && (
-              <div className="text-center py-10 text-destructive bg-destructive/10 rounded-lg shadow-md">
-                <WifiOff className="mx-auto h-12 w-12 mb-3" />
-                <p className="font-medium">{eventError}</p>
-              </div>
-            )}
-            {!isLoadingEvents && !eventError && recentEvents.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {recentEvents.map((event) => (
-                  <EventCard key={event.id} event={event} />
-                ))}
-              </div>
-            )}
-            {!isLoadingEvents && !eventError && recentEvents.length === 0 && (
-              <div className="text-center py-10 text-muted-foreground bg-card/50 rounded-lg shadow">
-                <SearchX className="mx-auto h-12 w-12 mb-3 text-primary" />
-                <p className="font-medium">No recent events found.</p>
-                <p className="text-sm">Be the first to <Link href="/dashboard" className="text-primary hover:underline font-semibold">create one</Link>!</p>
-              </div>
-            )}
-          </section>
-          <EventDiscovery />
-        </div>
-      )}
+        <EventDiscovery />
+      </div>
     </div>
   );
 }
