@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { ThemeProvider } from '@/components/providers';
-// import { AuthProvider } from '@/contexts/authContext'; // ClerkProvider will handle auth
+// import { AuthProvider } from '@/contexts/authContext'; // ClerkProvider will handle auth, so custom AuthProvider is not needed here.
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
 import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
@@ -63,9 +63,49 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!clerkPublishableKey) {
+    console.error("******************************************************************************");
+    console.error("Clerk Publishable Key is missing!");
+    console.error("Please set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env.local file.");
+    console.error("You can get your key from the Clerk Dashboard: https://dashboard.clerk.com");
+    console.error("Clerk authentication will not function correctly until this is resolved.");
+    console.error("******************************************************************************");
+    // Fallback rendering if key is missing, ClerkProvider won't be initialized properly
+    return (
+      <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+        <head>
+          {/* Metadata head elements from above */}
+        </head>
+        <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <div className="relative flex min-h-screen flex-col">
+              <SiteHeader />
+              <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6">
+                <div className="p-4 text-center text-red-600 bg-red-100 border border-red-600 rounded-md">
+                  Clerk authentication is not configured. Please check the server logs.
+                </div>
+                {children}
+              </main>
+              <SiteFooter />
+              <BottomNavigationBar />
+            </div>
+            <Toaster />
+          </ThemeProvider>
+          <SpeedInsightsWrapper />
+        </body>
+      </html>
+    );
+  }
+  
+  // Log the key for debugging purposes (consider removing in production)
+  // console.log('Clerk Publishable Key being used:', clerkPublishableKey);
+
   return (
+    // ClerkProvider setup for authentication. Ensure NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY are set in .env.local.
     <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      publishableKey={clerkPublishableKey}
       appearance={{
         variables: {
           colorPrimary: 'hsl(var(--primary))',
@@ -86,7 +126,7 @@ export default function RootLayout({
         }
       }}
     >
-      <html lang="en" className={GeistSans.className} suppressHydrationWarning>
+      <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <head>
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -98,7 +138,6 @@ export default function RootLayout({
           <meta name="msapplication-tap-highlight" content="no" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
-          {/* AuthProvider is removed as ClerkProvider handles authentication state */}
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <div className="relative flex min-h-screen flex-col">
               <SiteHeader />
