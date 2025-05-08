@@ -1,6 +1,7 @@
+
 'use client';
 
-import { EVENT_CATEGORIES, type EventCategory, type DateRangeFilter, type KarnatakaDistrict, KARNATAKA_DISTRICTS } from '@/types/event';
+import { type EventCategory, type DateRangeFilter, type KarnatakaDistrict } from '@/types/event';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,6 +17,8 @@ import { Input } from '@/components/ui/input';
 import { ListFilter, Search, MapPin } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { Label as ShadcnLabel } from '@/components/ui/label'; // Using Shadcn Label
 
 
 interface EventFiltersProps {
@@ -29,11 +32,6 @@ interface EventFiltersProps {
   selectedDistrict: KarnatakaDistrict | 'All';
   setSelectedDistrict: Dispatch<SetStateAction<KarnatakaDistrict | 'All'>>;
   availableCategories: EventCategory[];
-  // TODO: Add city and taluk filters when data is available
-  // selectedCity: string;
-  // setSelectedCity: Dispatch<SetStateAction<string>>;
-  // selectedTaluk: string;
-  // setSelectedTaluk: Dispatch<SetStateAction<string>>;
 }
 
 const dateRangeOptions: DateRangeFilter[] = ["Today", "This Weekend", "Next 7 Days", "All"];
@@ -61,13 +59,13 @@ export function EventFilters({
     <div className="mb-8 p-4 bg-card border rounded-lg shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="lg:col-span-1">
-          <Label htmlFor="search">Search Events</Label>
+          <ShadcnLabel htmlFor="search">Search Events</ShadcnLabel>
           <div className="relative mt-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="search"
               type="text"
-              placeholder="ಕಾರ್ಯಕ್ರಮ, ಸ್ಥಳ, ವರ್ಗ..."
+              placeholder="Event, Place, Category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -76,7 +74,7 @@ export function EventFilters({
         </div>
 
         <div>
-          <Label>District (ಜಿಲ್ಲೆ)</Label>
+          <ShadcnLabel>District</ShadcnLabel>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full justify-between mt-1">
@@ -101,7 +99,7 @@ export function EventFilters({
         </div>
         
         <div>
-          <Label>Category (ವರ್ಗ)</Label>
+          <ShadcnLabel>Category</ShadcnLabel>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full justify-between mt-1">
@@ -127,7 +125,7 @@ export function EventFilters({
         </div>
 
         <div>
-          <Label>Date Range (ದಿನಾಂಕ)</Label>
+          <ShadcnLabel>Date Range</ShadcnLabel>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full justify-between mt-1">
@@ -150,17 +148,4 @@ export function EventFilters({
       </div>
     </div>
   );
-}
-
-// Basic Label component if not already globally available or part of a UI library
-function Label({ htmlFor, children, className }: { htmlFor?: string, children: React.ReactNode, className?: string }) {
-  return (
-    <label htmlFor={htmlFor} className={cn("block text-sm font-medium text-foreground mb-1", className)}>
-      {children}
-    </label>
-  );
-}
-
-function cn(...inputs: Array<string | undefined | null | false | Record<string, boolean>>): string {
-  return inputs.filter(Boolean).join(' ');
 }

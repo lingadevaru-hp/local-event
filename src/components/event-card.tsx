@@ -1,9 +1,10 @@
+
 import type { Event } from '@/types/event';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CalendarDays, MapPin, Star, Tag, Users, Languages, IndianRupee, Landmark } from 'lucide-react';
+import { CalendarDays, MapPin, Star, Tag, Languages, IndianRupee, Compass } from 'lucide-react'; // Changed Landmark to Compass
 import { Badge } from '@/components/ui/badge';
 
 interface EventCardProps {
@@ -11,7 +12,7 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
-  const displayDate = new Date(event.date).toLocaleDateString('en-IN', { // Using en-IN for broader Indian date format
+  const displayDate = new Date(event.date).toLocaleDateString('en-IN', {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -28,7 +29,7 @@ export function EventCard({ event }: EventCardProps) {
             width={600}
             height={400}
             className="w-full h-48 object-cover"
-            data-ai-hint="event image"
+            data-ai-hint="event image karnataka"
           />
         </Link>
       </CardHeader>
@@ -37,7 +38,8 @@ export function EventCard({ event }: EventCardProps) {
           <CardTitle className="text-xl mb-1 hover:text-primary transition-colors">
             {event.name}
           </CardTitle>
-          {event.nameKa && <p className="text-sm text-muted-foreground mb-2">{event.nameKa}</p>}
+          {/* Optional: Display Kannada name if available and desired, e.g., for screen readers or specific user preference */}
+          {/* {event.nameKa && <p className="text-sm text-muted-foreground mb-2">({event.nameKa})</p>} */}
         </Link>
         <CardDescription className="text-sm text-muted-foreground line-clamp-3 mb-3">
           {event.description}
@@ -53,8 +55,7 @@ export function EventCard({ event }: EventCardProps) {
           </div>
            {event.distance && (
             <div className="flex items-center">
-               {/* Using an inline SVG for compass-like icon as per guideline example */}
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-accent"><path d="M4 10c0 4.4 4 8 8 8s8-3.6 8-8c0-4.4-4-8-8-8s-8 3.6-8 8Z"/><path d="M16 10c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4Z"/><path d="M12 2v3"/><path d="M12 20v-3"/><path d="m6.4 7.4-.8-.8"/><path d="m18.4 16.4-.8-.8"/><path d="M4 12H1"/><path d="M23 12h-3"/><path d="m6.4 16.6.8-.8"/><path d="m18.4 7.6.8-.8"/></svg>
+               <Compass className="h-4 w-4 mr-2 text-accent" /> {/* Using Compass icon */}
               <span>{event.distance.toFixed(1)} km away</span>
             </div>
           )}
@@ -85,7 +86,7 @@ export function EventCard({ event }: EventCardProps) {
           </span>
         </div>
         <Button asChild size="sm" variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90">
-          <Link href={`/events/${event.id}`}>ವಿವರಗಳು (Details)</Link>
+          <Link href={`/events/${event.id}`}>Details</Link>
         </Button>
       </CardFooter>
     </Card>

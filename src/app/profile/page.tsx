@@ -1,41 +1,46 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserCircle, Save, Edit3 } from 'lucide-react';
+import { Loader2, Save, Edit3, UserCircle } from 'lucide-react'; // Added UserCircle
 import { KARNATAKA_DISTRICTS, KARNATAKA_CITIES, LANGUAGE_PREFERENCES, USER_INTERESTS, type User, type KarnatakaDistrict, type KarnatakaCity, type LanguagePreference, type UserInterest } from '@/types/event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
+// import { doc, getDoc, setDoc } from 'firebase/firestore'; // Firestore imports for profile data
+// import { firestore } from '@/lib/firebase'; // Firestore instance
 
-// Mock current user data - replace with actual fetch from auth context/API
-let MOCK_USER_DATA: User = {
-  id: 'devUser123',
-  name: 'Ananya Kulkarni',
-  username: 'AnanyaK',
-  gender: 'Female',
-  dob: '1995-08-15',
-  email: 'ananya.k@example.com',
-  phoneNumber: '+919876543210',
-  district: 'Bengaluru Urban',
-  city: 'Bengaluru',
-  languagePreference: 'Kannada',
-  collegeOrInstitution: 'PES University',
-  interests: ['Tech Fests', 'Startup Meets', 'Music'],
-  createdAt: '2023-05-10',
+const createInitialUserDataFromAuth = (firebaseUser: import('firebase/auth').User): User => {
+  return {
+    id: firebaseUser.uid,
+    name: firebaseUser.displayName || '',
+    username: firebaseUser.displayName?.replace(/\s+/g, '').toLowerCase() || firebaseUser.email?.split('@')[0] || 'user',
+    email: firebaseUser.email || '',
+    photoURL: firebaseUser.photoURL || undefined,
+    languagePreference: 'English', // Default
+    createdAt: firebaseUser.metadata.creationTime || new Date().toISOString(),
+  };
 };
 
+
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+  
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const { toast } = useToast();
 
-  // Form state for editing
+  // Form state
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | 'Prefer not to say' | ''>('');
   const [dob, setDob] = useState('');
@@ -48,24 +53,60 @@ export default function ProfilePage() {
   const [interests, setInterests] = useState<UserInterest[]>([]);
 
   useEffect(() => {
-    // Simulate fetching user data
-    setIsLoading(true);
-    setTimeout(() => {
-      setUser(MOCK_USER_DATA);
-      // Initialize form fields if user data is loaded
-      setName(MOCK_USER_DATA.name);
-      setGender(MOCK_USER_DATA.gender || '');
-      setDob(MOCK_USER_DATA.dob || '');
-      setPhoneNumber(MOCK_USER_DATA.phoneNumber || '');
-      setDistrict(MOCK_USER_DATA.district || '');
-      setCity(MOCK_USER_DATA.city || '');
-      setCustomCity(MOCK_USER_DATA.customCity || '');
-      setLanguagePreference(MOCK_USER_DATA.languagePreference);
-      setCollegeOrInstitution(MOCK_USER_DATA.collegeOrInstitution || '');
-      setInterests(MOCK_USER_DATA.interests || []);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    if (!authLoading && !currentUser) {
+      router.push('/login');
+      return;
+    }
+
+    if (currentUser && !userProfile) { // Fetch or initialize profile only once
+      const fetchUserProfile = async () => {
+        setIsLoadingProfile(true);
+        // TODO: Implement actual Firestore fetch
+        // const userDocRef = doc(firestore, 'users', currentUser.uid);
+        // const userDocSnap = await getDoc(userDocRef);
+
+        let profileData: User;
+        // if (userDocSnap.exists()) {
+        //   profileData = userDocSnap.data() as User;
+        //   // Ensure core auth fields are up-to-date
+        //   profileData.name = currentUser.displayName || profileData.name;
+        //   profileData.email = currentUser.email || profileData.email;
+        //   profileData.photoURL = currentUser.photoURL || profileData.photoURL;
+        // } else {
+          // New user or no profile in Firestore yet, create from auth
+          profileData = createInitialUserDataFromAuth(currentUser);
+          // Optionally, save this initial profile to Firestore immediately
+          // await setDoc(userDocRef, profileData); 
+        // }
+        
+        // Mocking profile data fetch for now
+        await new Promise(resolve => setTimeout(resolve, 500));
+        profileData = createInitialUserDataFromAuth(currentUser); 
+        // Add some mock details if desired for new users for testing
+        // profileData.district = 'Bengaluru Urban'; 
+        // profileData.languagePreference = 'English';
+
+        setUserProfile(profileData);
+        
+        // Initialize form fields
+        setName(profileData.name);
+        setGender(profileData.gender || '');
+        setDob(profileData.dob || '');
+        setPhoneNumber(profileData.phoneNumber || '');
+        setDistrict(profileData.district || '');
+        setCity(profileData.city || '');
+        setCustomCity(profileData.customCity || '');
+        setLanguagePreference(profileData.languagePreference || 'English');
+        setCollegeOrInstitution(profileData.collegeOrInstitution || '');
+        setInterests(profileData.interests || []);
+        setIsLoadingProfile(false);
+      };
+      fetchUserProfile();
+    } else if (!currentUser && !authLoading) { // Ensure profile loader stops if user logs out
+        setIsLoadingProfile(false);
+    }
+  }, [currentUser, authLoading, router, userProfile]);
+
 
   const handleInterestChange = (interest: UserInterest) => {
     setInterests(prev => 
@@ -75,12 +116,12 @@ export default function ProfilePage() {
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    // Simulate API call to update user profile
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    if (!userProfile || !currentUser) return;
+
+    setIsSaving(true);
     
     const updatedUserData: User = {
-      ...user!, // Assume user is not null here
+      ...userProfile,
       name,
       gender: gender || undefined,
       dob: dob || undefined,
@@ -88,24 +129,28 @@ export default function ProfilePage() {
       district: district || undefined,
       city: city === 'Other' ? undefined : (city || undefined),
       customCity: city === 'Other' ? (customCity || undefined) : undefined,
-      languagePreference: languagePreference as LanguagePreference, // Assuming it's always set
+      languagePreference: languagePreference as LanguagePreference,
       collegeOrInstitution: collegeOrInstitution || undefined,
       interests: interests.length > 0 ? interests : undefined,
+      // Ensure core auth fields are preserved or updated if changed via Firebase Auth directly
+      photoURL: currentUser.photoURL || userProfile.photoURL, 
     };
-    setUser(updatedUserData); // Update local state
-    MOCK_USER_DATA = updatedUserData; // Update mock source for demo persistence
+
+    // TODO: Implement actual Firestore save
+    // const userDocRef = doc(firestore, 'users', currentUser.uid);
+    // await setDoc(userDocRef, updatedUserData, { merge: true });
+    console.log("Saving user data (mock):", updatedUserData);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setUserProfile(updatedUserData); 
     
     toast({ title: 'Profile Updated!', description: 'Your profile information has been saved.' });
-    setIsLoading(false);
+    setIsSaving(false);
     setIsEditing(false);
   };
   
-  if (isLoading && !user) {
+  if (authLoading || isLoadingProfile || !userProfile) { 
     return <div className="container mx-auto flex min-h-[calc(100vh-10rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
-  }
-
-  if (!user) {
-    return <div className="container mx-auto text-center py-10">Could not load user profile. Please try again.</div>;
   }
 
   return (
@@ -113,13 +158,13 @@ export default function ProfilePage() {
       <Card className="shadow-xl">
         <CardHeader className="text-center relative">
           <Avatar className="mx-auto h-24 w-24 mb-4 border-2 border-primary">
-            <AvatarImage src={`https://picsum.photos/seed/${user.username}/200/200`} alt={user.name} data-ai-hint="profile large person" />
-            <AvatarFallback className="text-3xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={userProfile.photoURL || `https://picsum.photos/seed/${userProfile.username}/200/200`} alt={userProfile.name} data-ai-hint="profile large person"/>
+            <AvatarFallback className="text-3xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : <UserCircle className="h-12 w-12" />}</AvatarFallback>
           </Avatar>
-          <CardTitle className="text-2xl font-bold">{user.name}</CardTitle>
-          <CardDescription>{user.email}</CardDescription>
+          <CardTitle className="text-2xl font-bold">{userProfile.name || 'User Profile'}</CardTitle>
+          <CardDescription>{userProfile.email}</CardDescription>
           {!isEditing && (
-            <Button variant="outline" size="sm" className="absolute top-4 right-4" onClick={() => setIsEditing(true)}>
+            <Button variant="outline" size="sm" className="absolute top-4 right-4" onClick={() => setIsEditing(true)} disabled={isSaving}>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
             </Button>
           )}
@@ -127,77 +172,78 @@ export default function ProfilePage() {
         <CardContent>
           {isEditing ? (
             <form onSubmit={handleSaveChanges} className="space-y-6">
+              {/* Form fields as before, ensuring `disabled={isSaving}` */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label htmlFor="edit-name">Full Name *</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required /></div>
+                <div><Label htmlFor="edit-name">Full Name *</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
                 <div>
                   <Label htmlFor="edit-gender">Gender</Label>
-                  <Select value={gender} onValueChange={v => setGender(v as any)}>
+                  <Select value={gender} onValueChange={v => setGender(v as any)} disabled={isSaving}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Other">Other</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label htmlFor="edit-dob">Date of Birth</Label><Input id="edit-dob" type="date" value={dob} onChange={e => setDob(e.target.value)} /></div>
-                <div><Label htmlFor="edit-phone">Phone Number</Label><Input id="edit-phone" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+91 XXXXX XXXXX" /></div>
+                <div><Label htmlFor="edit-dob">Date of Birth</Label><Input id="edit-dob" type="date" value={dob} onChange={e => setDob(e.target.value)} disabled={isSaving}/></div>
+                <div><Label htmlFor="edit-phone">Phone Number</Label><Input id="edit-phone" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+91 XXXXX XXXXX" disabled={isSaving}/></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-district">District (Karnataka) *</Label>
-                  <Select value={district} onValueChange={v => setDistrict(v as KarnatakaDistrict)} required>
+                  <Select value={district} onValueChange={v => setDistrict(v as KarnatakaDistrict)} required disabled={isSaving}>
                     <SelectTrigger><SelectValue placeholder="Select district" /></SelectTrigger>
                     <SelectContent>{KARNATAKA_DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label htmlFor="edit-city">City/Town (Karnataka)</Label>
-                  <Select value={city} onValueChange={v => setCity(v as KarnatakaCity)} disabled={!district}>
+                  <Select value={city} onValueChange={v => setCity(v as KarnatakaCity)} disabled={isSaving || !district}>
                     <SelectTrigger><SelectValue placeholder="Select city/town" /></SelectTrigger>
                     <SelectContent>{KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
-                  {city === 'Other' && <Input type="text" placeholder="Enter your city/town" value={customCity} onChange={e => setCustomCity(e.target.value)} className="mt-2" />}
+                  {city === 'Other' && <Input type="text" placeholder="Enter your city/town" value={customCity} onChange={e => setCustomCity(e.target.value)} className="mt-2" disabled={isSaving}/>}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-language">Language Preference *</Label>
-                  <Select value={languagePreference} onValueChange={v => setLanguagePreference(v as LanguagePreference)} required>
+                  <Select value={languagePreference} onValueChange={v => setLanguagePreference(v as LanguagePreference)} required disabled={isSaving}>
                     <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
                     <SelectContent>{LANGUAGE_PREFERENCES.map(lang => <SelectItem key={lang} value={lang}>{lang}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div><Label htmlFor="edit-college">College/Institution</Label><Input id="edit-college" value={collegeOrInstitution} onChange={e => setCollegeOrInstitution(e.target.value)} /></div>
+                <div><Label htmlFor="edit-college">College/Institution</Label><Input id="edit-college" value={collegeOrInstitution} onChange={e => setCollegeOrInstitution(e.target.value)} disabled={isSaving}/></div>
               </div>
               <div>
                 <Label>Interests</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto mt-1">
                   {USER_INTERESTS.map(interest => (
                     <div key={interest} className="flex items-center space-x-2">
-                      <Checkbox id={`edit-interest-${interest.replace(/\s+/g, '-')}`} checked={interests.includes(interest)} onCheckedChange={() => handleInterestChange(interest)} />
+                      <Checkbox id={`edit-interest-${interest.replace(/\s+/g, '-')}`} checked={interests.includes(interest)} onCheckedChange={() => handleInterestChange(interest)} disabled={isSaving}/>
                       <Label htmlFor={`edit-interest-${interest.replace(/\s+/g, '-')}`} className="text-sm font-normal">{interest}</Label>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isLoading}>Cancel</Button>
-                <Button type="submit" disabled={isLoading} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+                <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</Button>
+                <Button type="submit" disabled={isSaving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
                 </Button>
               </div>
             </form>
           ) : (
             <div className="space-y-4 text-sm">
-              <ProfileDetail label="Full Name" value={user.name} />
-              <ProfileDetail label="Gender" value={user.gender} />
-              <ProfileDetail label="Date of Birth" value={user.dob ? new Date(user.dob).toLocaleDateString('en-IN') : undefined} />
-              <ProfileDetail label="Phone Number" value={user.phoneNumber} />
-              <ProfileDetail label="District" value={user.district} />
-              <ProfileDetail label="City/Town" value={user.customCity || user.city} />
-              <ProfileDetail label="Language Preference" value={user.languagePreference} />
-              <ProfileDetail label="College/Institution" value={user.collegeOrInstitution} />
-              <ProfileDetail label="Interests" value={user.interests?.join(', ')} />
-              <ProfileDetail label="Member Since" value={new Date(user.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })} />
+              <ProfileDetail label="Full Name" value={userProfile.name} />
+              <ProfileDetail label="Gender" value={userProfile.gender} />
+              <ProfileDetail label="Date of Birth" value={userProfile.dob ? new Date(userProfile.dob).toLocaleDateString('en-IN') : undefined} />
+              <ProfileDetail label="Phone Number" value={userProfile.phoneNumber} />
+              <ProfileDetail label="District" value={userProfile.district} />
+              <ProfileDetail label="City/Town" value={userProfile.customCity || userProfile.city} />
+              <ProfileDetail label="Language Preference" value={userProfile.languagePreference} />
+              <ProfileDetail label="College/Institution" value={userProfile.collegeOrInstitution} />
+              <ProfileDetail label="Interests" value={userProfile.interests?.join(', ')} />
+              <ProfileDetail label="Member Since" value={new Date(userProfile.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })} />
             </div>
           )}
         </CardContent>
@@ -207,7 +253,7 @@ export default function ProfilePage() {
 }
 
 function ProfileDetail({ label, value }: { label: string, value?: string }) {
-  if (!value) return null;
+  if (value === undefined || value === null || value === '') return null;
   return (
     <div className="flex justify-between border-b pb-2">
       <span className="font-medium text-muted-foreground">{label}:</span>
@@ -215,4 +261,3 @@ function ProfileDetail({ label, value }: { label: string, value?: string }) {
     </div>
   );
 }
-

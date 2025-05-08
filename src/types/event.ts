@@ -1,3 +1,4 @@
+
 export type KarnatakaDistrict = 
   | "Bagalkot" | "Ballari (Bellary)" | "Belagavi (Belgaum)" | "Bengaluru Rural" | "Bengaluru Urban"
   | "Bidar" | "Chamarajanagar" | "Chikkaballapur" | "Chikkamagaluru" | "Chitradurga"
@@ -13,7 +14,6 @@ export const KARNATAKA_DISTRICTS: KarnatakaDistrict[] = [
   "Shivamogga (Shimoga)", "Tumakuru (Tumkur)", "Udupi", "Uttara Kannada", "Vijayapura (Bijapur)", "Yadgir", "Vijayanagara"
 ];
 
-// Example cities, in a real app this would be a more comprehensive list, possibly hierarchical under districts.
 export type KarnatakaCity = 
   | "Bengaluru" | "Mysuru" | "Mangaluru" | "Hubballi" | "Dharwad" | "Belagavi" | "Tumakuru" | "Udupi" 
   | "Shivamogga" | "Davanagere" | "Ballari" | "Vijayapura" | "Kalaburagi" | "Raichur" | "Hassan" | "Kolar" | "Other";
@@ -35,22 +35,23 @@ export const USER_INTERESTS: UserInterest[] = [
   "Kannada Kavighosti", "Utsava", "Jatre", "Rangoli Competitions", "Music", "Sports", "Arts", "Food", "Community"
 ];
 
+// Represents user profile data, potentially stored in Firestore
 export interface User {
-  id: string;
+  id: string; // Firebase UID
   name: string;
-  gender?: "Male" | "Female" | "Other" | "Prefer not to say";
-  dob?: string; // Date of Birth ISO string
+  username: string; 
   email: string;
-  phoneNumber?: string; // Optional, for OTP
+  photoURL?: string; // From Firebase Auth or custom upload
+  gender?: "Male" | "Female" | "Other" | "Prefer not to say";
+  dob?: string; // Date of Birth ISO string YYYY-MM-DD
+  phoneNumber?: string;
   district?: KarnatakaDistrict;
-  city?: KarnatakaCity; // Could be manual input if 'Other' district/city
-  customCity?: string; // For manual city input
+  city?: KarnatakaCity | string; // Allow string for 'Other' or custom cities
+  customCity?: string; 
   languagePreference: LanguagePreference;
   collegeOrInstitution?: string;
   interests?: UserInterest[];
-  createdAt: string;
-  // username for display, derived or same as name for simplicity here
-  username: string; 
+  createdAt: string; // ISO string
 }
 
 export interface Rating {
@@ -61,7 +62,7 @@ export interface Rating {
   reviewText?: string;
   createdAt: string;
   updatedAt: string;
-  user?: Partial<User>; // Optionally include user details like name/username
+  user?: Partial<User>; // Optionally include user details from their profile for display
 }
 
 export type EventCategory = 
@@ -78,66 +79,63 @@ export const EVENT_CATEGORIES: EventCategory[] = [
 export type CulturalRelevanceTag = "Karaga" | "Jatre" | "Dasara" | "Rajyotsava" | "Hampi Utsava" | "Kambala" | "Other Festival";
 export const CULTURAL_RELEVANCE_TAGS: CulturalRelevanceTag[] = ["Karaga", "Jatre", "Dasara", "Rajyotsava", "Hampi Utsava", "Kambala", "Other Festival"];
 
-
 export interface Event {
   id: string;
-  name: string; // Can be bilingual, main entry
+  name: string; 
   nameKa?: string; // Optional Kannada name
   description: string;
   descriptionKa?: string; // Optional Kannada description
-  date: string; // ISO string for start date
+  date: string; // ISO string for start date YYYY-MM-DD
   endDate?: string; // ISO string for end date, optional
-  time: string; // Start time, e.g., "10:00 AM"
+  time: string; // Start time, e.g., "10:00 AM" / "HH:MM"
   endTime?: string; // End time, optional
   
-  locationName: string; // e.g., Kanteerava Stadium, JSS Auditorium
-  address: string; // Full address
+  locationName: string; // e.g., Kanteerava Stadium
+  address: string; // Full address string
   district: KarnatakaDistrict;
-  city: KarnatakaCity; // Or specific city within district
-  taluk?: string; // Optional
-  pinCode?: string; // Optional
-  latitude: number;
-  longitude: number;
-  googleMapsUrl?: string; // For directions
-  localLandmark?: string; // For local directions
+  city: KarnatakaCity | string; // Can be from KARNATAKA_CITIES or a custom string
+  taluk?: string; 
+  pinCode?: string; 
+  latitude: number; // For map integration & distance calculation
+  longitude: number; // For map integration & distance calculation
+  googleMapsUrl?: string; // Optional direct link to Google Maps
+  localLandmark?: string; 
 
   category: EventCategory;
-  language: LanguagePreference; // Language of the event itself
+  language: LanguagePreference; 
   culturalRelevance?: CulturalRelevanceTag[];
 
-  imageUrl?: string; // Main poster
-  posterKaUrl?: string; // Optional Kannada poster
+  imageUrl?: string; // Main poster URL
+  posterKaUrl?: string; // Optional Kannada poster URL
 
-  organizerId?: string; // Link to User ID of organizer
-  organizerName?: string; // Or just organizer display name
+  organizerId?: string; // Firebase UID of the event creator/organizer
+  organizerName?: string; // Display name of the organizer
 
-  price?: number; // In INR. 0 or undefined for free events
+  price?: number; // In INR. 0 or undefined/null for free events
   registrationUrl?: string; // Link to external registration or internal form
 
-  createdAt: string;
-  averageRating?: number; // Calculated
-  ratings?: Rating[]; // List of ratings and reviews
-  distance?: number; // in km, calculated on frontend for discovery
+  createdAt: string; // ISO string
+  averageRating?: number; 
+  ratings?: Rating[]; 
+  distance?: number; // in km, calculated on frontend if user location is available
   
-  targetDistricts?: KarnatakaDistrict[]; // For targeted notifications by organizers
+  targetDistricts?: KarnatakaDistrict[]; 
 }
 
 export type DateRangeFilter = "Today" | "This Weekend" | "Next 7 Days" | "All";
 
-
-// WatchList related types
 export interface WatchListItem {
-  userId: string;
+  userId: string; // Firebase UID
   eventId: string;
-  addedAt: string;
+  addedAt: string; // ISO string
 }
 
 export interface WatchListNotification {
   id: string;
-  userId: string;
+  userId: string; // Firebase UID
   eventId: string;
-  message: string; // e.g., "Event date is near", "Price reduced", "Location updated"
-  type: "DATE_NEAR" | "PRICE_REDUCED" | "LOCATION_UPDATED";
-  createdAt: string;
+  message: string; 
+  type: "DATE_NEAR" | "PRICE_REDUCED" | "LOCATION_UPDATED"; // Add more specific types as needed
+  createdAt: string; // ISO string
   isRead: boolean;
 }

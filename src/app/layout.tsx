@@ -1,3 +1,4 @@
+
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import './globals.css';
@@ -13,7 +14,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#3498db", // Calming Blue
+  themeColor: [ // For dark mode support via next-themes
+    { media: '(prefers-color-scheme: light)', color: 'hsl(0 0% 100%)' }, // White (light background)
+    { media: '(prefers-color-scheme: dark)', color: 'hsl(222.2 84% 4.9%)' }, // Dark Grey/Black (dark background)
+  ],
 };
 
 export default function RootLayout({

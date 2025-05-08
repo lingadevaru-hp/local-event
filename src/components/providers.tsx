@@ -1,11 +1,16 @@
+
 "use client";
 
 import type * as React from "react";
-
-// This component can be used to wrap your application with any client-side context providers
-// For example, React Query Provider, Theme Provider, etc.
-// For now, it's a simple pass-through.
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { AuthProvider } from "@/contexts/auth-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </NextThemesProvider>
+  );
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,17 +8,17 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListChecks, Info, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 
 // Mock function to get watchlist events - replace with actual API call
 async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
   console.log('Fetching watchlist for user:', userId);
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1000));
   
-  // In a real app, filter MOCK_EVENTS_KARNATAKA or fetch from backend based on localStorage/DB
-  const MOCK_EVENTS_KARNATAKA: Event[] = [ // Copied from event-discovery for demo
+  const MOCK_EVENTS_KARNATAKA: Event[] = [ 
     { 
-      id: '1', name: 'Kala Utsava Bengaluru', nameKa: 'ಕಲಾ ಉತ್ಸವ ಬೆಂಗಳೂರು', 
+      id: '1', name: 'Kala Utsava Bengaluru', 
       description: 'A grand celebration of Karnataka\'s art and culture...', 
       date: '2024-09-15', time: '10:00 AM', 
       locationName: 'Vidhana Soudha Grounds', address: 'Bengaluru', 
@@ -26,7 +27,7 @@ async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
       imageUrl: 'https://picsum.photos/seed/utsava/600/400', createdAt: '2024-02-01', averageRating: 4.7, price: 0
     },
     { 
-      id: '3', name: 'Yakshagana Sammelana Udupi', nameKa: 'ಯಕ್ಷಗಾನ ಸಮ್ಮೇಳನ ಉಡುಪಿ',
+      id: '3', name: 'Yakshagana Sammelana Udupi',
       description: 'A grand gathering of Yakshagana artists...', 
       date: '2024-11-20', time: '06:00 PM', 
       locationName: 'Sri Krishna Mutt Complex', address: 'Udupi', 
@@ -37,42 +38,45 @@ async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
   ];
 
   const watchlistEventIds: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('watchlist_') && localStorage.getItem(key) === 'true') {
-      watchlistEventIds.push(key.replace('watchlist_', ''));
+  if (typeof window !== 'undefined') { // Ensure localStorage is available
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('watchlist_') && localStorage.getItem(key) === 'true') {
+        // Potentially, store watchlist items as `watchlist_USERID_EVENTID`
+        // For this mock, we assume USERID part is implicitly handled or items are global for demo
+        watchlistEventIds.push(key.replace('watchlist_', ''));
+      }
     }
   }
+  // In a real app, filter MOCK_EVENTS_KARNATAKA or fetch from backend based on userId and their specific watchlist items.
   return MOCK_EVENTS_KARNATAKA.filter(event => watchlistEventIds.includes(event.id));
 }
 
 
 export default function WatchlistPage() {
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [watchlistEvents, setWatchlistEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // For watchlist data fetching
   const [error, setError] = useState<string | null>(null);
 
-  // Mock current user ID - replace with actual user from auth context
-  const currentUserId = 'devUser123'; 
-
   useEffect(() => {
-    if (currentUserId) {
+    if (!authLoading && !currentUser) {
+      router.push('/login');
+    } else if (currentUser) {
       setIsLoading(true);
-      fetchWatchlistEvents(currentUserId)
+      fetchWatchlistEvents(currentUser.uid) // Pass current user's ID
         .then(setWatchlistEvents)
         .catch(err => {
           console.error("Failed to load watchlist:", err);
           setError("Could not load your watchlist. Please try again later.");
         })
         .finally(() => setIsLoading(false));
-    } else {
-      // Handle case where user is not authenticated, though page access should be protected
-      setError("Please log in to view your watchlist.");
-      setIsLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUser, authLoading, router]);
 
-  if (isLoading) {
+  if (isLoading || authLoading) { // Combined loading state
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -96,19 +100,19 @@ export default function WatchlistPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center">
-          <ListChecks className="mr-3 h-8 w-8" /> My Watchlist (ನನ್ನ ವೀಕ್ಷಣಾ ಪಟ್ಟಿ)
+          <ListChecks className="mr-3 h-8 w-8" /> My Watchlist
         </h1>
       </div>
 
       {watchlistEvents.length === 0 ? (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Your Watchlist is Empty (ನಿಮ್ಮ ವೀಕ್ಷಣಾ ಪಟ್ಟಿ ಖಾಲಿಯಾಗಿದೆ)</AlertTitle>
+          <AlertTitle>Your Watchlist is Empty</AlertTitle>
           <AlertDescription>
             You haven&apos;t added any events to your watchlist yet. Browse events and click the heart icon to save them here.
             <br />
             <Button asChild variant="link" className="px-0">
-              <Link href="/">Discover Events (ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಅನ್ವೇಷಿಸಿ)</Link>
+              <Link href="/">Discover Events</Link>
             </Button>
           </AlertDescription>
         </Alert>
