@@ -1,6 +1,7 @@
-'use client';
 
-import { useEffect, useState } from 'react';
+'use client';
+import type React from 'react'; // Import React for React.use()
+import { useEffect, useState, use } from 'react'; // Added use
 import type { Event, Rating as RatingType } from '@/types/event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -15,47 +16,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-const MOCK_EVENTS_KARNATAKA: Event[] = [
-  { 
-    id: '1', name: 'Kala Utsava Bengaluru', nameKa: 'ಕಲಾ ಉತ್ಸವ ಬೆಂಗಳೂರು', 
-    description: 'A grand celebration of Karnataka\'s art and culture in the heart of Bengaluru. This multi-day event features traditional music, dance performances, art exhibitions, food stalls showcasing local cuisine, and handicraft markets. A must-visit for anyone looking to experience the rich heritage of Karnataka.', 
-    descriptionKa: 'ಬೆಂಗಳೂರಿನ ಹೃದಯಭಾಗದಲ್ಲಿ ಕರ್ನಾಟಕದ ಕಲೆ ಮತ್ತು ಸಂಸ್ಕೃತಿಯ ಭವ್ಯ ಆಚರಣೆ...',
-    date: '2024-09-15', time: '10:00 AM', endDate: '2024-09-17', endTime: '08:00 PM',
-    locationName: 'Vidhana Soudha Grounds', address: 'Ambedkar Veedhi, Sampangi Rama Nagara, Bengaluru, Karnataka 560001', 
-    district: 'Bengaluru Urban', city: 'Bengaluru', taluk: 'Bengaluru North', pinCode: '560001',
-    latitude: 12.9797, longitude: 77.5913, googleMapsUrl: 'https://maps.google.com/?q=12.9797,77.5913', localLandmark: 'Opposite to High Court of Karnataka',
-    category: 'Utsava', language: 'Bilingual', culturalRelevance: ['Rajyotsava', 'Other Festival'],
-    imageUrl: 'https://picsum.photos/seed/utsava_detail/1200/600', posterKaUrl: 'https://picsum.photos/seed/utsavaKA_detail/800/500',
-    organizerName: 'Department of Kannada & Culture, GoK',
-    createdAt: '2024-02-01', averageRating: 4.7, price: 0, registrationUrl: 'https://example.com/kala-utsava-register',
-    ratings: [
-      {id: 'r1', userId: 'u1', eventId: '1', rating: 5, reviewText: 'Absolutely fantastic! The performances were mesmerizing.', createdAt: '2024-09-16', updatedAt: '2024-09-16', user: { id: 'u1', username: 'CultureFan', name: 'Ananya Rao', languagePreference: 'English', photoURL: 'https://picsum.photos/seed/ananya/40/40'}},
-      {id: 'r2', userId: 'u2', eventId: '1', rating: 4, reviewText: 'Great Utsava, well organized. Parking was challenging.', createdAt: '2024-09-17', updatedAt: '2024-09-17', user: { id: 'u2', username: 'BengaluruExplorer', name: 'Rohan Kumar', languagePreference: 'English'}},
-    ],
-    targetDistricts: ['Bengaluru Urban', 'Bengaluru Rural', 'Ramanagara']
-  },
-  { 
-    id: '2', name: 'Mysuru Dasara Tech Hackathon',
-    description: 'Innovate and build during the vibrant Mysuru Dasara festivities. This event brings together developers, designers, and tech enthusiasts to create solutions for real-world problems, with a focus on local challenges and opportunities within Karnataka.', 
-    date: '2024-10-05', time: '09:00 AM', endDate: '2024-10-06', endTime: '06:00 PM',
-    locationName: 'JSS Science and Technology University', address: 'SJCE Campus, Mysuru, Karnataka 570006', 
-    district: 'Mysuru (Mysore)', city: 'Mysuru', taluk: 'Mysuru City', pinCode: '570006',
-    latitude: 12.314, longitude: 76.612, googleMapsUrl: 'https://maps.google.com/?q=12.314,76.612', localLandmark: 'Near SJCE College Canteen',
-    category: 'Hackathons', language: 'English', culturalRelevance: ['Dasara'],
-    imageUrl: 'https://picsum.photos/seed/hackathon_detail/1200/600', 
-    organizerName: 'JSS S&TU and Karnataka IT Department',
-    createdAt: '2024-03-01', averageRating: 4.9, price: 100, registrationUrl: 'https://example.com/mysuru-hackathon-register',
-    ratings: [] 
-  },
-];
-
+import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Import mock events
 
 async function fetchEventById(id: string): Promise<Event | null> {
   console.log("Fetching event by ID:", id);
   return new Promise(resolve => {
     setTimeout(() => {
-      const event = MOCK_EVENTS_KARNATAKA.find(e => e.id === id) || null;
+      const event = MOCK_EVENTS_DATA.find(e => e.id === id) || null;
       if (event) console.log("Event found:", event.name);
       else console.log("Event not found for ID:", id);
       resolve(event);
@@ -82,9 +49,22 @@ async function submitReview(eventId: string, rating: number, reviewText: string,
             name: user?.name || 'Anonymous User',
             photoURL: user?.photoURL || undefined,
             languagePreference: 'English', 
-            createdAt: new Date().toISOString() 
+            // createdAt: new Date().toISOString() // Removed as it's not part of Partial<User> from Rating
         }
       };
+      // Add review to mock data (for session persistence of review)
+      const eventIndex = MOCK_EVENTS_DATA.findIndex(e => e.id === eventId);
+      if (eventIndex > -1) {
+        const existingRatings = MOCK_EVENTS_DATA[eventIndex].ratings || [];
+        const userPreviousReviewIndex = existingRatings.findIndex(r => r.userId === newReview.userId);
+        if(userPreviousReviewIndex > -1) {
+            MOCK_EVENTS_DATA[eventIndex].ratings![userPreviousReviewIndex] = newReview;
+        } else {
+            MOCK_EVENTS_DATA[eventIndex].ratings = [...existingRatings, newReview];
+        }
+        const totalRatingSum = MOCK_EVENTS_DATA[eventIndex].ratings!.reduce((sum, r) => sum + r.rating, 0);
+        MOCK_EVENTS_DATA[eventIndex].averageRating = MOCK_EVENTS_DATA[eventIndex].ratings!.length > 0 ? totalRatingSum / MOCK_EVENTS_DATA[eventIndex].ratings!.length : 0;
+      }
       resolve(newReview);
     }, 1000);
   });
@@ -98,6 +78,8 @@ async function signUpForEvent(eventId: string, userId: string): Promise<{ succes
             // Simulate success/failure
             const success = Math.random() > 0.1; // 90% success rate
             if (success) {
+                // In a real app, store this signup relation in a database
+                console.log(`User ${userId} successfully signed up for event ${eventId}`);
                 resolve({ success: true, message: "Successfully signed up for the event!" });
             } else {
                 resolve({ success: false, message: "Failed to sign up for the event. Please try again." });
@@ -111,7 +93,8 @@ interface EventPageProps {
   params: { id: string };
 }
 
-export default function EventPage({ params }: EventPageProps) {
+export default function EventPage({ params: paramsProp }: EventPageProps) {
+  const params = use(paramsProp); // Unwrap params using React.use()
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
@@ -128,10 +111,11 @@ export default function EventPage({ params }: EventPageProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (params.id) {
+    const eventId = params.id;
+    if (eventId) {
       setIsLoading(true);
       setError(null); // Reset error on new ID
-      fetchEventById(params.id)
+      fetchEventById(eventId)
         .then(data => {
           if (data) {
             setEvent(data);
@@ -143,7 +127,7 @@ export default function EventPage({ params }: EventPageProps) {
               }
             }
             if (typeof window !== 'undefined') {
-                 setIsInWatchlist(localStorage.getItem(`watchlist_${params.id}_${currentUser?.id || 'guest'}`) === 'true');
+                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${currentUser?.id || 'guest'}`) === 'true');
             }
           } else {
             setError('Event not found.');
@@ -157,7 +141,7 @@ export default function EventPage({ params }: EventPageProps) {
   const handleRatingSubmit = async () => {
     if (!currentUser) {
       toast({ title: "Login Required", description: "Please log in to submit a review.", variant: "destructive" });
-      router.push('/login');
+      router.push(`/login?redirect=/events/${params.id}`);
       return;
     }
     if (userRating === 0) {
@@ -209,7 +193,7 @@ export default function EventPage({ params }: EventPageProps) {
     setIsWatchlistLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); 
     const newWatchlistStatus = !isInWatchlist;
-    const watchlistItemKey = `watchlist_${params.id}_${currentUser.id}`;
+    const watchlistItemKey = `watchlist_${params.id}_${currentUser.id}`; // Use current user's ID
     setIsInWatchlist(newWatchlistStatus);
     if (typeof window !== 'undefined') {
         if (newWatchlistStatus) {
@@ -285,15 +269,22 @@ export default function EventPage({ params }: EventPageProps) {
             <CardTitle className="text-3xl md:text-5xl font-bold text-primary-foreground tracking-tight drop-shadow-lg">
               {eventTitle}
             </CardTitle>
+             {event.nameKa && <p className="text-lg md:text-xl text-primary-foreground/90 mt-1 drop-shadow-sm">{event.nameKa}</p>}
           </div>
         </CardHeader>
         <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
             <section>
-              <h2 className="text-2xl font-semibold mb-3 text-primary">Event Details</h2>
+              <h2 className="text-2xl font-semibold mb-3 text-primary">Event Description</h2>
               <p className="text-foreground leading-relaxed whitespace-pre-line text-base">
                 {eventDescription}
               </p>
+              {event.descriptionKa && (
+                <div className="mt-4 p-3 bg-secondary/30 rounded-md">
+                    <h3 className="text-lg font-medium text-primary mb-1">ವಿವರಣೆ (Kannada)</h3>
+                    <p className="text-foreground leading-relaxed whitespace-pre-line text-base">{event.descriptionKa}</p>
+                </div>
+              )}
             </section>
 
             

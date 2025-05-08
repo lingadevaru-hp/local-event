@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,24 +14,7 @@ import { KARNATAKA_DISTRICTS, EVENT_CATEGORIES, LANGUAGE_PREFERENCES, type Karna
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-// Mock existing events for the dashboard view
-const mockOrganizerEvents: Event[] = [
-    { 
-    id: 'org_event_1', name: 'Belagavi Tech Summit 2024', 
-    description: 'A premier tech conference in North Karnataka focusing on AI and IoT.', 
-    date: '2024-11-10', time: '09:00 AM', 
-    locationName: 'Visvesvaraya Technological University Auditorium', address: 'Jnana Sangama, VTU Main Rd, Visvesvaraya Technological University, Machhe, Belagavi, Karnataka 590018', 
-    district: 'Belagavi (Belgaum)', city: 'Belagavi', latitude: 15.8497, longitude: 74.4977, 
-    category: 'Tech Fests', language: 'English',
-    imageUrl: 'https://picsum.photos/seed/techsummit/600/400', 
-    createdAt: '2024-07-01', price: 500,
-    targetDistricts: ['Belagavi (Belgaum)', 'Dharwad', 'Vijayapura (Bijapur)'],
-    registrationUrl: 'https://example.com/techsummit-register',
-    organizerId: 'mockUserId123', // Assuming this user created it
-  },
-];
-
+import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Import centralized mock data
 
 export default function OrganizerDashboardPage() {
   const { currentUser, loading: authLoading } = useAuth();
@@ -60,8 +44,9 @@ export default function OrganizerDashboardPage() {
     if (!authLoading && !currentUser) {
       router.push('/login?redirect=/dashboard');
     } else if (currentUser) {
-      // TODO: Fetch events created by this currentUser from a real backend
-      setMyEvents(mockOrganizerEvents.filter(event => event.organizerId === currentUser.id));
+      // Fetch events created by this currentUser from MOCK_EVENTS_DATA
+      const userEvents = MOCK_EVENTS_DATA.filter(event => event.organizerId === currentUser.id);
+      setMyEvents(userEvents);
     }
   }, [currentUser, authLoading, router]);
 
@@ -84,16 +69,16 @@ export default function OrganizerDashboardPage() {
         return;
     }
     setIsSubmitting(true);
-    // TODO: Implement actual event creation logic (e.g., save to Firestore)
-    // This includes uploading posters to Firebase Storage if files are selected.
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    
+    // Simulate API call for event creation
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
     
     const newEvent: Event = {
         id: `evt_${Date.now()}`,
         name: eventName, 
         description, date, time, locationName, address,
         district: district as KarnatakaDistrict, 
-        city: city, // City is now a string
+        city: city, 
         latitude: 0, longitude: 0, // Placeholder, implement geocoding or manual input
         category: category as EventCategory, language: language as LanguagePreference,
         createdAt: new Date().toISOString(),
@@ -103,11 +88,13 @@ export default function OrganizerDashboardPage() {
         imageUrl: posterEng ? URL.createObjectURL(posterEng) : `https://picsum.photos/seed/${Date.now()}/600/400`,
         posterKaUrl: posterKa ? URL.createObjectURL(posterKa) : undefined,
         organizerId: currentUser.id,
-        organizerName: currentUser.name || currentUser.email || 'Organizer',
+        organizerName: currentUser.name || currentUser.email?.split('@')[0] || 'Organizer',
     };
-    setMyEvents(prev => [newEvent, ...prev]);
-    // Add to global mock events for other pages to see during session
-    // MOCK_EVENTS_KARNATAKA.unshift(newEvent); //This can lead to issues if not managed well. Better to fetch from a "source of truth"
+
+    // Add to global mock events (MOCK_EVENTS_DATA) for demo purposes
+    // In a real app, this would be an API call to save to a database
+    MOCK_EVENTS_DATA.unshift(newEvent); 
+    setMyEvents(prev => [newEvent, ...prev]); // Update local state for dashboard view
 
     toast({ title: 'Event Created!', description: `${eventName} has been successfully created.` });
     // Reset form

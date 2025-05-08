@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,7 +23,7 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   
   const [district, setDistrict] = useState<KarnatakaDistrict | ''>('');
-  const [city, setCity] = useState<KarnatakaCity | ''>('');
+  const [city, setCity] = useState<KarnatakaCity | 'Other' | ''>(''); // Allow 'Other'
   const [customCity, setCustomCity] = useState('');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference | ''>('');
   const [collegeOrInstitution, setCollegeOrInstitution] = useState('');
@@ -50,6 +51,11 @@ export default function RegisterPage() {
       toast({ title: 'Missing Information', description: 'Please fill all required fields (*).', variant: 'destructive' });
       return;
     }
+    if (city === 'Other' && !customCity) {
+      toast({ title: 'Missing Information', description: 'Please specify your city/town.', variant: 'destructive' });
+      return;
+    }
+
 
     const userData: Omit<AppUser, 'id' | 'createdAt' | 'photoURL'> = {
         name,
@@ -59,7 +65,7 @@ export default function RegisterPage() {
         dob: dob || undefined,
         phoneNumber: phoneNumber || undefined,
         district: district as KarnatakaDistrict, // Cast as it's required
-        city: city === 'Other' ? customCity || undefined : city || undefined,
+        city: city === 'Other' ? undefined : (city as KarnatakaCity) || undefined,
         customCity: city === 'Other' ? customCity || undefined : undefined,
         languagePreference: languagePreference as LanguagePreference, // Cast as it's required
         collegeOrInstitution: collegeOrInstitution || undefined,
@@ -136,11 +142,11 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="city">City/Town (Karnataka)</Label>
-                <Select value={city} onValueChange={(value) => setCity(value as KarnatakaCity)} disabled={loading || !district}>
+                <Select value={city} onValueChange={(value) => setCity(value as KarnatakaCity | 'Other')} disabled={loading || !district}>
                   <SelectTrigger><SelectValue placeholder="Select your city/town" /></SelectTrigger>
                   <SelectContent>
                     {KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                     <SelectItem value="Other">Other (Please specify)</SelectItem>
+                     <SelectItem key="city-other" value="Other">Other (Please specify)</SelectItem>
                   </SelectContent>
                 </Select>
                  {city === 'Other' && (

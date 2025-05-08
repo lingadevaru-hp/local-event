@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { BellRing, Info, Loader2, Trash2, Eye } from 'lucide-react';
+import { BellRing, Info, Loader2, Trash2, Eye, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
@@ -14,14 +14,19 @@ import { useRouter } from 'next/navigation';
 
 const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
   { 
-    id: 'notif1', userId: 'devUser123', eventId: '1', // 'devUser123' is a placeholder ID
+    id: 'notif1', userId: 'mockUserId123', eventId: '1', // Example userId
     message: 'Kala Utsava Bengaluru is starting in 3 days!', 
     type: 'DATE_NEAR', createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), isRead: false 
   },
   { 
-    id: 'notif2', userId: 'devUser123', eventId: '3', 
+    id: 'notif2', userId: 'mockUserId123', eventId: '3', 
     message: 'Price reduced for Yakshagana Sammelana Udupi! Now ₹40.', 
     type: 'PRICE_REDUCED', createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), isRead: false
+  },
+    { 
+    id: 'notif3', userId: 'anotherUser456', eventId: '2', 
+    message: 'Mysuru Dasara Tech Hackathon has new updates!', 
+    type: 'LOCATION_UPDATED', createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString(), isRead: true
   },
 ];
 
@@ -59,27 +64,29 @@ export default function NotificationsPage() {
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<WatchListNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // For notifications data fetching
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
-      router.push('/login');
+      router.push('/login?redirect=/notifications');
     } else if (currentUser) {
       setIsLoading(true);
-      fetchNotifications(currentUser.uid) // Use actual UID
+      fetchNotifications(currentUser.id) // Use currentUser.id (from AppUser)
         .then(setNotifications)
         .catch(err => {
           console.error("Failed to load notifications:", err);
           setError("Could not load your notifications. Please try again later.");
         })
         .finally(() => setIsLoading(false));
+    } else if (!authLoading && !currentUser) {
+        setIsLoading(false);
     }
   }, [currentUser, authLoading, router]);
 
   const handleMarkAsRead = async (id: string) => {
     if (!currentUser) return;
-    const success = await markNotificationAsRead(id, currentUser.uid);
+    const success = await markNotificationAsRead(id, currentUser.id); // Use currentUser.id
     if (success) {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     }
@@ -87,7 +94,7 @@ export default function NotificationsPage() {
 
   const handleDelete = async (id: string) => {
     if (!currentUser) return;
-    const success = await deleteNotification(id, currentUser.uid);
+    const success = await deleteNotification(id, currentUser.id); // Use currentUser.id
     if (success) {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }
@@ -109,11 +116,28 @@ export default function NotificationsPage() {
     return Math.floor(seconds) + " seconds ago";
   };
 
-  if (isLoading || authLoading) { // Combined loading state
+  if (isLoading || authLoading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4 text-lg text-muted-foreground">Loading notifications...</p>
+      </div>
+    );
+  }
+  
+  if (!currentUser && !authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Button variant="outline" asChild className="mb-6">
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+        </Button>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Login Required</AlertTitle>
+          <AlertDescription>
+            Please <Link href="/login?redirect=/notifications" className="underline text-primary">log in</Link> to view your notifications.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -125,6 +149,9 @@ export default function NotificationsPage() {
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+        <Button variant="outline" asChild className="mt-4">
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+        </Button>
       </div>
     );
   }
@@ -135,6 +162,9 @@ export default function NotificationsPage() {
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center">
           <BellRing className="mr-3 h-8 w-8" /> Notifications
         </h1>
+        <Button variant="outline" asChild>
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+        </Button>
       </div>
 
       {notifications.length === 0 ? (

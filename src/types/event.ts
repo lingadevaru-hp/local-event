@@ -1,4 +1,5 @@
 
+
 export type KarnatakaDistrict = 
   | "Bagalkot" | "Ballari (Bellary)" | "Belagavi (Belgaum)" | "Bengaluru Rural" | "Bengaluru Urban"
   | "Bidar" | "Chamarajanagar" | "Chikkaballapur" | "Chikkamagaluru" | "Chitradurga"
@@ -14,25 +15,30 @@ export const KARNATAKA_DISTRICTS: KarnatakaDistrict[] = [
   "Shivamogga (Shimoga)", "Tumakuru (Tumkur)", "Udupi", "Uttara Kannada", "Vijayapura (Bijapur)", "Yadgir", "Vijayanagara"
 ];
 
+// "Other" removed from this type. The UI will handle "Other (Please specify)" as a special case.
 export type KarnatakaCity = 
   | "Bengaluru" | "Mysuru" | "Mangaluru" | "Hubballi" | "Dharwad" | "Belagavi" | "Tumakuru" | "Udupi" 
-  | "Shivamogga" | "Davanagere" | "Ballari" | "Vijayapura" | "Kalaburagi" | "Raichur" | "Hassan" | "Kolar" | "Other";
+  | "Shivamogga" | "Davanagere" | "Ballari" | "Vijayapura" | "Kalaburagi" | "Raichur" | "Hassan" | "Kolar";
 
+// "Other" removed from this array.
 export const KARNATAKA_CITIES: KarnatakaCity[] = [
   "Bengaluru", "Mysuru", "Mangaluru", "Hubballi", "Dharwad", "Belagavi", "Tumakuru", "Udupi", 
-  "Shivamogga", "Davanagere", "Ballari", "Vijayapura", "Kalaburagi", "Raichur", "Hassan", "Kolar", "Other"
+  "Shivamogga", "Davanagere", "Ballari", "Vijayapura", "Kalaburagi", "Raichur", "Hassan", "Kolar"
 ];
+
 
 export type LanguagePreference = "Kannada" | "English" | "Bilingual";
 export const LANGUAGE_PREFERENCES: LanguagePreference[] = ["Kannada", "English", "Bilingual"];
 
 export type UserInterest = 
   | "Tech Fests" | "Yakshagana" | "Startup Meets" | "Hackathons" | "College Fests" 
-  | "Kannada Kavighosti" | "Utsava" | "Jatre" | "Rangoli Competitions" | "Music" | "Sports" | "Arts" | "Food" | "Community";
+  | "Kannada Kavighosti" | "Utsava" | "Jatre" | "Rangoli Competitions" | "Music" | "Sports" | "Arts" | "Food" | "Community"
+  | "Literature" | "Tourism"; // Added new interests
 
 export const USER_INTERESTS: UserInterest[] = [
   "Tech Fests", "Yakshagana", "Startup Meets", "Hackathons", "College Fests", 
-  "Kannada Kavighosti", "Utsava", "Jatre", "Rangoli Competitions", "Music", "Sports", "Arts", "Food", "Community"
+  "Kannada Kavighosti", "Utsava", "Jatre", "Rangoli Competitions", "Music", "Sports", "Arts", "Food", "Community",
+  "Literature", "Tourism" // Added new interests
 ];
 
 // Represents user profile data, potentially stored in Firestore
@@ -46,12 +52,13 @@ export interface User {
   dob?: string; // Date of Birth ISO string YYYY-MM-DD
   phoneNumber?: string;
   district?: KarnatakaDistrict;
-  city?: KarnatakaCity | string; // Allow string for 'Other' or custom cities
+  city?: KarnatakaCity | string; // Allow string for 'Other' or custom cities if needed by data model, but dropdown will use specific list
   customCity?: string; 
   languagePreference: LanguagePreference;
   collegeOrInstitution?: string;
   interests?: UserInterest[];
   createdAt: string; // ISO string
+  uid?: string; // To align with Firebase user.uid if different from 'id' (though usually they are the same)
 }
 
 export interface Rating {
@@ -68,12 +75,15 @@ export interface Rating {
 export type EventCategory = 
   | "Utsava" | "Hackathons" | "College Fests" | "Startup Meets" | "Kannada Kavighosti"
   | "Tech Fests" | "Yakshagana" | "Jatre" | "Rangoli Competitions"
-  | "Music" | "Workshop" | "Sport" | "Arts" | "Food" | "Community" | "Other";
+  | "Music" | "Workshop" | "Sport" | "Arts" | "Food" | "Community" 
+  | "Literature" | "Tourism" | "Heritage Walk" | "Drama/Theatre" | "Exhibition" | "Conference" | "Seminar" | "Other";
+
 
 export const EVENT_CATEGORIES: EventCategory[] = [
   "Utsava", "Hackathons", "College Fests", "Startup Meets", "Kannada Kavighosti",
   "Tech Fests", "Yakshagana", "Jatre", "Rangoli Competitions",
-  "Music", "Workshop", "Sport", "Arts", "Food", "Community", "Other"
+  "Music", "Workshop", "Sport", "Arts", "Food", "Community", 
+  "Literature", "Tourism", "Heritage Walk", "Drama/Theatre", "Exhibition", "Conference", "Seminar", "Other"
 ];
 
 export type CulturalRelevanceTag = "Karaga" | "Jatre" | "Dasara" | "Rajyotsava" | "Hampi Utsava" | "Kambala" | "Other Festival";

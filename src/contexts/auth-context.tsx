@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -5,6 +6,8 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User as AppUser } from '@/types/event'; // Using our app's User type
+import { auth, googleAuthProvider } from '@/lib/firebase'; // Import Firebase auth and provider
+import { signInWithPopup, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
 interface AuthContextType {
   currentUser: AppUser | null;
@@ -16,6 +19,8 @@ interface AuthContextType {
   isLoggingInViaOtp: boolean; // To manage OTP input UI state
   otpEmail: string | null; // To store email during OTP flow
   clearOtpState: () => void;
+  loginWithGoogle?: () => Promise<{ success: boolean; message: string; user?: AppUser }>; // Optional for now
+  updateUserProfile: (updatedData: Partial<AppUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +31,7 @@ const MOCK_USERS: Record<string, AppUser> = {
     id: "mockUserId123",
     email: "user@example.com",
     name: "Mock User",
+    username: "mockuser",
     languagePreference: "English",
     createdAt: new Date().toISOString(),
   }
@@ -40,44 +46,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Simulate checking auth state on load (e.g., from localStorage)
+  const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser, additionalData?: Partial<AppUser>): AppUser => {
+    // Check if user exists in MOCK_USERS to retain any app-specific data not in FirebaseUser
+    const existingMockUser = Object.values(MOCK_USERS).find(u => u.email === firebaseUser.email);
+    
+    return {
+      id: firebaseUser.uid,
+      email: firebaseUser.email || '',
+      name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
+      username: firebaseUser.email?.split('@')[0] || `user${Date.now()}`,
+      photoURL: firebaseUser.photoURL || undefined,
+      languagePreference: existingMockUser?.languagePreference || 'English', // Default if not found
+      createdAt: existingMockUser?.createdAt || firebaseUser.metadata.creationTime || new Date().toISOString(),
+      // Merge additionalData and any other fields from existingMockUser if needed
+      ...existingMockUser,
+      ...additionalData,
+    };
+  };
+
+  // Listen to Firebase auth state changes
   useEffect(() => {
-    setLoading(true);
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser) as AppUser;
-        // Basic validation
-        if (parsedUser && parsedUser.id && parsedUser.email) {
-          setCurrentUser(parsedUser);
-        } else {
-          localStorage.removeItem('currentUser');
+    if (!auth) { // Firebase not initialized
+      setLoading(false);
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        const appUser = mapFirebaseUserToAppUser(firebaseUser);
+        setCurrentUser(appUser);
+        localStorage.setItem('currentUser', JSON.stringify(appUser));
+         // Ensure user exists in mock store or add them
+        if (!MOCK_USERS[appUser.email.toLowerCase()]) {
+            MOCK_USERS[appUser.email.toLowerCase()] = appUser;
         }
-      } catch (error) {
-        console.error("Error parsing stored user:", error);
+      } else {
+        setCurrentUser(null);
         localStorage.removeItem('currentUser');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
+
+
+  // Load user from localStorage on initial mount if Firebase hasn't kicked in yet
+  useEffect(() => {
+    if(!currentUser && !loading) { // Only if not already set by onAuthStateChanged and initial loading is done
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser) as AppUser;
+            if (parsedUser && parsedUser.id && parsedUser.email) {
+              setCurrentUser(parsedUser);
+            } else {
+              localStorage.removeItem('currentUser');
+            }
+          } catch (error) {
+            console.error("Error parsing stored user:", error);
+            localStorage.removeItem('currentUser');
+          }
+        }
+    }
+  }, [currentUser, loading]);
+
 
   const requestOtp = useCallback(async (email: string): Promise<{ success: boolean; message: string }> => {
     setAuthActionLoading(true);
     return new Promise(resolve => {
       setTimeout(() => {
-        // In a real app, you'd call your backend to send an OTP
         if (!email || !email.includes('@')) {
             setAuthActionLoading(false);
             resolve({ success: false, message: "Invalid email format." });
             return;
         }
-        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
         MOCK_OTP_STORE[email.toLowerCase()] = generatedOtp;
-        console.log(`OTP for ${email}: ${generatedOtp}`); // For testing
+        console.log(`OTP for ${email}: ${generatedOtp}`);
         
         toast({
           title: "OTP Sent",
-          description: `An OTP has been sent to ${email}. (Check console for mock OTP: ${generatedOtp})`,
+          description: `An OTP has been sent to ${email}. (Mock OTP: ${generatedOtp})`,
         });
         setIsLoggingInViaOtp(true);
         setOtpEmail(email.toLowerCase());
@@ -93,22 +142,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTimeout(() => {
         const normalizedEmail = email.toLowerCase();
         if (MOCK_OTP_STORE[normalizedEmail] && MOCK_OTP_STORE[normalizedEmail] === otp) {
-          delete MOCK_OTP_STORE[normalizedEmail]; // OTP used
+          delete MOCK_OTP_STORE[normalizedEmail];
           
-          // Find or create user (simplified)
           let userToLogin = Object.values(MOCK_USERS).find(u => u.email.toLowerCase() === normalizedEmail);
           if (!userToLogin) {
-            // If user doesn't exist from a prior registration, create a basic one
-            // Or, ideally, registration should happen first.
-            // For this flow, let's assume registration is separate or handled differently.
-            // If an OTP is verified for an email not in MOCK_USERS, it means they should register first.
-            // For now, we will allow login if OTP is correct, assuming the user might exist.
-            // A more robust system would check if user exists.
-            // Let's create a dummy user if not found, for simplicity of OTP login demonstration
              userToLogin = {
-                id: `user_${Date.now()}`,
+                id: `user_otp_${Date.now()}`,
                 email: normalizedEmail,
                 name: normalizedEmail.split('@')[0],
+                username: normalizedEmail.split('@')[0],
                 languagePreference: "English",
                 createdAt: new Date().toISOString(),
              };
@@ -139,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resolve({ success: false, message: "User with this email already exists." });
           return;
         }
-        const newUserId = `user_${Date.now()}`;
+        const newUserId = `user_reg_${Date.now()}`;
         const newUser: AppUser = {
           id: newUserId,
           ...userData,
@@ -153,8 +195,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const loginWithGoogle = useCallback(async (): Promise<{ success: boolean; message: string; user?: AppUser }> => {
+    if (!auth || !googleAuthProvider) {
+      return { success: false, message: "Firebase not configured for Google Sign-In." };
+    }
+    setAuthActionLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      const firebaseUser = result.user;
+      const appUser = mapFirebaseUserToAppUser(firebaseUser);
+      
+      setCurrentUser(appUser);
+      localStorage.setItem('currentUser', JSON.stringify(appUser));
+      // Ensure user exists in mock store or add them (for app-specific data persistence if needed)
+      if (!MOCK_USERS[appUser.email.toLowerCase()]) {
+          MOCK_USERS[appUser.email.toLowerCase()] = appUser;
+      } else { // If user exists, update with latest from Google
+          MOCK_USERS[appUser.email.toLowerCase()] = {
+            ...MOCK_USERS[appUser.email.toLowerCase()], // Keep existing app-specific data
+            ...appUser // Override with Google data where applicable (name, photoURL)
+          };
+          setCurrentUser(MOCK_USERS[appUser.email.toLowerCase()]);
+          localStorage.setItem('currentUser', JSON.stringify(MOCK_USERS[appUser.email.toLowerCase()]));
+      }
+
+      toast({ title: "Login Successful", description: `Welcome, ${appUser.name}!` });
+      setAuthActionLoading(false);
+      return { success: true, message: "Logged in with Google successfully.", user: appUser };
+    } catch (error: any) {
+      console.error("Google Sign-In Error:", error);
+      toast({ title: "Google Sign-In Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+      setAuthActionLoading(false);
+      return { success: false, message: error.message || "Failed to sign in with Google." };
+    }
+  }, [toast]);
+
+
   const logout = useCallback(async () => {
     setAuthActionLoading(true);
+    if (auth) {
+      await signOut(auth); // Sign out from Firebase
+    }
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
     setIsLoggingInViaOtp(false);
@@ -168,8 +249,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOtpEmail(null);
   }, []);
 
-  if (loading) { // Initial app load check
-     if (typeof window !== 'undefined' && !['/login', '/register', '/'].includes(window.location.pathname)) {
+  const updateUserProfile = useCallback((updatedData: Partial<AppUser>) => {
+    setCurrentUser(prevUser => {
+      if (!prevUser) return null;
+      const newUser = { ...prevUser, ...updatedData };
+      localStorage.setItem('currentUser', JSON.stringify(newUser));
+      // Update mock store as well
+      if (MOCK_USERS[newUser.email.toLowerCase()]) {
+        MOCK_USERS[newUser.email.toLowerCase()] = newUser;
+      }
+      return newUser;
+    });
+  }, []);
+
+
+  if (loading) { 
+     if (typeof window !== 'undefined' && !['/login', '/register', '/'].includes(window.location.pathname) && !window.location.pathname.startsWith('/events/')) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -182,14 +277,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ 
         currentUser, 
-        loading: loading || authActionLoading, // Combined loading state for UI
+        loading: loading || authActionLoading,
         requestOtp, 
         verifyOtpAndLogin,
         registerUser, 
         logout,
         isLoggingInViaOtp,
         otpEmail,
-        clearOtpState
+        clearOtpState,
+        loginWithGoogle,
+        updateUserProfile,
     }}>
       {children}
     </AuthContext.Provider>

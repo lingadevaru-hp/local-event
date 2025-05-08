@@ -1,0 +1,125 @@
+
+import type { Event } from '@/types/event';
+
+export const MOCK_EVENTS_DATA: Event[] = [
+  { 
+    id: '1', name: 'Kala Utsava Bengaluru', nameKa: 'ಕಲಾ ಉತ್ಸವ ಬೆಂಗಳೂರು', 
+    description: 'A grand celebration of Karnataka\'s art and culture in the heart of Bengaluru. This multi-day event features traditional music, dance performances, art exhibitions, food stalls showcasing local cuisine, and handicraft markets. A must-visit for anyone looking to experience the rich heritage of Karnataka.', 
+    descriptionKa: 'ಬೆಂಗಳೂರಿನ ಹೃದಯಭಾಗದಲ್ಲಿ ಕರ್ನಾಟಕದ ಕಲೆ ಮತ್ತು ಸಂಸ್ಕೃತಿಯ ಭವ್ಯ ಆಚರಣೆ. ಈ ಬಹು-ದಿನದ ಕಾರ್ಯಕ್ರಮವು ಸಾಂಪ್ರದಾಯಿಕ ಸಂಗೀತ, ನೃತ್ಯ ಪ್ರದರ್ಶನಗಳು, ಕಲಾ ಪ್ರದರ್ಶನಗಳು, ಸ್ಥಳೀಯ ಪಾಕಪದ್ಧತಿಯನ್ನು ಪ್ರದರ್ಶಿಸುವ ಆಹಾರ ಮಳಿಗೆಗಳು ಮತ್ತು ಕರಕುಶಲ ಮಾರುಕಟ್ಟೆಗಳನ್ನು ಒಳಗೊಂಡಿದೆ. ಕರ್ನಾಟಕದ ಶ್ರೀಮಂತ ಪರಂಪರೆಯನ್ನು ಅನುಭವಿಸಲು ಬಯಸುವ ಯಾರಿಗಾದರೂ ಭೇಟಿ ನೀಡಲೇಬೇಕು.',
+    date: '2024-09-15', time: '10:00 AM', endDate: '2024-09-17', endTime: '08:00 PM',
+    locationName: 'Vidhana Soudha Grounds', address: 'Ambedkar Veedhi, Sampangi Rama Nagara, Bengaluru, Karnataka 560001', 
+    district: 'Bengaluru Urban', city: 'Bengaluru', taluk: 'Bengaluru North', pinCode: '560001',
+    latitude: 12.9797, longitude: 77.5913, googleMapsUrl: 'https://maps.google.com/?q=12.9797,77.5913', localLandmark: 'Opposite to High Court of Karnataka',
+    category: 'Utsava', language: 'Bilingual', culturalRelevance: ['Rajyotsava', 'Other Festival'],
+    imageUrl: 'https://picsum.photos/seed/utsava_karnataka/1200/600', posterKaUrl: 'https://picsum.photos/seed/utsavaKA_karnataka/800/500',
+    organizerName: 'Department of Kannada & Culture, GoK',
+    createdAt: '2024-02-01', averageRating: 4.7, price: 0, registrationUrl: 'https://example.com/kala-utsava-register',
+    ratings: [
+      {id: 'r1', userId: 'u1', eventId: '1', rating: 5, reviewText: 'Absolutely fantastic! The performances were mesmerizing.', createdAt: '2024-09-16', updatedAt: '2024-09-16', user: { id: 'u1', username: 'CultureFan', name: 'Ananya Rao', languagePreference: 'English', photoURL: 'https://picsum.photos/seed/ananya_avatar/40/40'}},
+      {id: 'r2', userId: 'u2', eventId: '1', rating: 4, reviewText: 'Great Utsava, well organized. Parking was challenging.', createdAt: '2024-09-17', updatedAt: '2024-09-17', user: { id: 'u2', username: 'BengaluruExplorer', name: 'Rohan Kumar', languagePreference: 'English'}},
+    ],
+    targetDistricts: ['Bengaluru Urban', 'Bengaluru Rural', 'Ramanagara']
+  },
+  { 
+    id: '2', name: 'Mysuru Dasara Tech Hackathon', nameKa: 'ಮೈಸೂರು ದಸರಾ ಟೆಕ್ ಹ್ಯಾಕಥಾನ್',
+    description: 'Innovate and build during the vibrant Mysuru Dasara festivities. This event brings together developers, designers, and tech enthusiasts to create solutions for real-world problems, with a focus on local challenges and opportunities within Karnataka.', 
+    descriptionKa: 'ವೈಭವದ ಮೈಸೂರು ದಸರಾ ಹಬ್ಬದ ಸಮಯದಲ್ಲಿ ಹೊಸತನವನ್ನು ನಿರ್ಮಿಸಿ. ಈ ಕಾರ್ಯಕ್ರಮವು ಡೆವಲಪರ್‌ಗಳು, ವಿನ್ಯಾಸಕರು ಮತ್ತು ತಂತ್ರಜ್ಞಾನ ಉತ್ಸಾಹಿಗಳನ್ನು ಒಟ್ಟುಗೂಡಿಸಿ ನೈಜ-ಪ್ರಪಂಚದ ಸಮಸ್ಯೆಗಳಿಗೆ ಪರಿಹಾರಗಳನ್ನು ರಚಿಸಲು, ಕರ್ನಾಟಕದೊಳಗಿನ ಸ್ಥಳೀಯ ಸವಾಲುಗಳು ಮತ್ತು ಅವಕಾಶಗಳ ಮೇಲೆ ಕೇಂದ್ರೀಕರಿಸುತ್ತದೆ.',
+    date: '2024-10-05', time: '09:00 AM', endDate: '2024-10-06', endTime: '06:00 PM',
+    locationName: 'JSS Science and Technology University', address: 'SJCE Campus, Mysuru, Karnataka 570006', 
+    district: 'Mysuru (Mysore)', city: 'Mysuru', taluk: 'Mysuru City', pinCode: '570006',
+    latitude: 12.314, longitude: 76.612, googleMapsUrl: 'https://maps.google.com/?q=12.314,76.612', localLandmark: 'Near SJCE College Canteen',
+    category: 'Hackathons', language: 'English', culturalRelevance: ['Dasara'],
+    imageUrl: 'https://picsum.photos/seed/hackathon_mysuru/1200/600', 
+    organizerName: 'JSS S&TU and Karnataka IT Department',
+    createdAt: '2024-03-01', averageRating: 4.9, price: 100, registrationUrl: 'https://example.com/mysuru-hackathon-register',
+    ratings: [] 
+  },
+  { 
+    id: '3', name: 'Yakshagana Sammelana Udupi', nameKa: 'ಯಕ್ಷಗಾನ ಸಮ್ಮೇಳನ ಉಡುಪಿ',
+    description: 'A grand gathering of Yakshagana artists and enthusiasts in Udupi, showcasing various forms of this traditional coastal Karnataka art form. Includes performances, workshops, and discussions.', 
+    descriptionKa: 'ಉಡುಪಿಯಲ್ಲಿ ಯಕ್ಷಗಾನ ಕಲಾವಿದರು ಮತ್ತು ಉತ್ಸಾಹಿಗಳ ಭವ್ಯ ಸಮಾವೇಶ, ಈ ಸಾಂಪ್ರದಾಯಿಕ ಕರಾವಳಿ ಕರ್ನಾಟಕ ಕಲಾ ಪ್ರಕಾರದ ವಿವಿಧ ರೂಪಗಳನ್ನು ಪ್ರದರ್ಶಿಸುತ್ತದೆ. ಪ್ರದರ್ಶನಗಳು, ಕಾರ್ಯಾಗಾರಗಳು ಮತ್ತು ಚರ್ಚೆಗಳನ್ನು ಒಳಗೊಂಡಿದೆ.',
+    date: '2024-11-20', time: '06:00 PM', endDate: '2024-11-22', endTime: '10:00 PM',
+    locationName: 'Sri Krishna Mutt Complex', address: 'Temple Car St, Thenkpete, Maruthi Veethika, Udupi, Karnataka 576101', 
+    district: 'Udupi', city: 'Udupi', taluk: 'Udupi', pinCode: '576101',
+    latitude: 13.342, longitude: 74.747, googleMapsUrl: 'https://maps.google.com/?q=13.342,74.747', localLandmark: 'Near Udupi Car Street',
+    category: 'Yakshagana', language: 'Kannada', culturalRelevance: ['Other Festival'],
+    imageUrl: 'https://picsum.photos/seed/yakshagana_udupi/600/400', 
+    organizerName: 'Udupi Yakshagana Kendra',
+    createdAt: '2024-04-01', averageRating: 4.5, price: 50, 
+    ratings: [
+        {id: 'r3', userId: 'u3', eventId: '3', rating: 5, reviewText: 'Authentic Yakshagana experience!', createdAt: '2024-11-21', updatedAt: '2024-11-21', user: { id: 'u3', username: 'ArtLoverUdupi', name: 'Prakash Shetty', languagePreference: 'Kannada'}},
+    ] 
+  },
+   { 
+    id: '4', name: 'Hubballi Startup Meet', nameKa: 'ಹುಬ್ಬಳ್ಳಿ ಸ್ಟಾರ್ಟ್ಅಪ್ ಮೀಟ್',
+    description: 'Networking event for entrepreneurs, investors, and startup ecosystem enablers in North Karnataka. Features keynote speakers, pitching sessions, and mentorship opportunities.', 
+    descriptionKa: 'ಉತ್ತರ ಕರ್ನಾಟಕದ ಉದ್ಯಮಿಗಳು, ಹೂಡಿಕೆದಾರರು ಮತ್ತು ಸ್ಟಾರ್ಟ್ಅಪ್ ಪರಿಸರ ವ್ಯವಸ್ಥೆಯ ಸಕ್ರಿಯಗೊಳಿಸುವವರಿಗಾಗಿ ನೆಟ್‌ವರ್ಕಿಂಗ್ ಕಾರ್ಯಕ್ರಮ. ಮುಖ್ಯ ಭಾಷಣಕಾರರು, ಪಿಚಿಂಗ್ ಸೆಷನ್‌ಗಳು ಮತ್ತು ಮಾರ್ಗದರ್ಶನ ಅವಕಾಶಗಳನ್ನು ಒಳಗೊಂಡಿದೆ.',
+    date: '2024-08-30', time: '02:00 PM', endTime: '07:00 PM',
+    locationName: 'Deshpande Foundation', address: 'Plot No. 1, BVB College of Engineering & Technology Campus, Vidyanagar, Hubballi, Karnataka 580029', 
+    district: 'Dharwad', city: 'Hubballi', taluk: 'Hubballi City', pinCode: '580029',
+    latitude: 15.3647, longitude: 75.1239, googleMapsUrl: 'https://maps.google.com/?q=15.3647,75.1239', localLandmark: 'Inside BVB Campus',
+    category: 'Startup Meets', language: 'English',
+    imageUrl: 'https://picsum.photos/seed/startupmeet_hubli/600/400', 
+    organizerName: 'Hubballi Tech Hub',
+    createdAt: '2024-05-01', ratings: [], averageRating: 4.2, price: 250, registrationUrl: 'https://example.com/hubli-startup-register'
+  },
+  {
+    id: '5', name: 'Kannada Kavighosti Kolar', nameKa: 'ಕನ್ನಡ ಕವಿಗೋಷ್ಠಿ ಕೋಲಾರ',
+    description: 'An evening dedicated to Kannada poetry, featuring established and upcoming poets from Kolar district and beyond. Recitations, discussions on poetic forms, and interactive sessions.',
+    descriptionKa: 'ಕೋಲಾರ ಜಿಲ್ಲೆ ಮತ್ತು ಸುತ್ತಮುತ್ತಲಿನ ಸ್ಥಾಪಿತ ಮತ್ತು ಉದಯೋನ್ಮುಖ ಕವಿಗಳನ್ನು ಒಳಗೊಂಡ ಕನ್ನಡ ಕಾವ್ಯಕ್ಕೆ ಮೀಸಲಾದ ಸಂಜೆ. ಪಠಣಗಳು, ಕಾವ್ಯಾತ್ಮಕ ರೂಪಗಳ ಮೇಲಿನ ಚರ್ಚೆಗಳು ಮತ್ತು ಸಂವಾದಾತ್ಮಕ ಅವಧಿಗಳು.',
+    date: '2024-12-05', time: '05:00 PM', endTime: '08:00 PM',
+    locationName: 'Kolar District Kannada Sahitya Parishat Hall', address: 'Gandhi Nagar, Kolar, Karnataka 563101',
+    district: 'Kolar', city: 'Kolar', taluk: 'Kolar', pinCode: '563101',
+    latitude: 13.1360, longitude: 78.1300, googleMapsUrl: 'https://maps.google.com/?q=13.1360,78.1300', localLandmark: 'Near Kolar Bus Stand',
+    category: 'Kannada Kavighosti', language: 'Kannada', culturalRelevance: ['Other Festival'],
+    imageUrl: 'https://picsum.photos/seed/kavighosti_kolar/600/400',
+    organizerName: 'Kolar District Kannada Sahitya Parishat',
+    createdAt: '2024-06-10', averageRating: 4.6, price: 0,
+    ratings: []
+  },
+  {
+    id: '6', name: 'Belagavi Tech Fest 2024', nameKa: 'ಬೆಳಗಾವಿ ಟೆಕ್ ಫೆಸ್ಟ್ ೨೦೨೪',
+    description: 'A comprehensive tech festival featuring workshops on AI, ML, cybersecurity, and a grand project expo. Aimed at students and tech professionals.',
+    descriptionKa: 'AI, ML, ಸೈಬರ್‌ಸೆಕ್ಯುರಿಟಿ ಕುರಿತು ಕಾರ್ಯಾಗಾರಗಳು ಮತ್ತು ಭವ್ಯವಾದ ಪ್ರಾಜೆಕ್ಟ್ ಎಕ್ಸ್‌ಪೋವನ್ನು ಒಳಗೊಂಡಿರುವ ಒಂದು ಸಮಗ್ರ ಟೆಕ್ ಉತ್ಸವ. ವಿದ್ಯಾರ್ಥಿಗಳು ಮತ್ತು ಟೆಕ್ ವೃತ್ತಿಪರರನ್ನು ಗುರಿಯಾಗಿರಿಸಿಕೊಂಡಿದೆ.',
+    date: '2024-10-25', time: '09:30 AM', endDate: '2024-10-26', endTime: '05:00 PM',
+    locationName: 'Visvesvaraya Technological University Auditorium', address: 'Jnana Sangama, VTU Main Rd, Machhe, Belagavi, Karnataka 590018',
+    district: 'Belagavi (Belgaum)', city: 'Belagavi', taluk: 'Belagavi', pinCode: '590018',
+    latitude: 15.8497, longitude: 74.4977, googleMapsUrl: 'https://maps.google.com/?q=15.8497,74.4977', localLandmark: 'VTU Main Campus',
+    category: 'Tech Fests', language: 'English',
+    imageUrl: 'https://picsum.photos/seed/techfest_belagavi/600/400',
+    organizerName: 'VTU Belagavi & Local Tech Community',
+    createdAt: '2024-07-15', averageRating: 4.8, price: 150, registrationUrl: 'https://example.com/belagavi-techfest-register',
+    ratings: [
+        {id: 'r4', userId: 'u4', eventId: '6', rating: 5, reviewText: 'Excellent workshops and great networking opportunities.', createdAt: '2024-10-26', updatedAt: '2024-10-26', user: { id: 'u4', username: 'TechGuru', name: 'Suresh Patil', languagePreference: 'English'}},
+    ]
+  },
+  { 
+    id: '7', name: 'Mangaluru Kambala Utsava', nameKa: 'ಮಂಗಳೂರು ಕಂಬಳ ಉತ್ಸವ', 
+    description: 'Experience the thrilling traditional buffalo race of coastal Karnataka. A vibrant cultural spectacle with folk dances and local cuisine.', 
+    descriptionKa: 'ಕರಾವಳಿ ಕರ್ನಾಟಕದ ರೋಮಾಂಚಕ ಸಾಂಪ್ರದಾಯಿಕ ಕೋಣಗಳ ಓಟವನ್ನು ಅನುಭವಿಸಿ. ಜಾನಪದ ನೃತ್ಯಗಳು ಮತ್ತು ಸ್ಥಳೀಯ ಪಾಕಪದ್ಧತಿಯೊಂದಿಗೆ ಒಂದು ರೋಮಾಂಚಕ ಸಾಂಸ್ಕೃತಿಕ ದೃಶ್ಯ.',
+    date: '2024-12-15', time: '08:00 AM', endTime: '06:00 PM',
+    locationName: 'Pilikula Nisargadhama Kambala Grounds', address: 'Pilikula, Moodushedde, Mangaluru, Karnataka 575028', 
+    district: 'Dakshina Kannada', city: 'Mangaluru', taluk: 'Mangaluru', pinCode: '575028',
+    latitude: 12.9376, longitude: 74.8970, googleMapsUrl: 'https://maps.google.com/?q=12.9376,74.8970', localLandmark: 'Near Pilikula Golf Club',
+    category: 'Utsava', language: 'Bilingual', culturalRelevance: ['Kambala'],
+    imageUrl: 'https://picsum.photos/seed/kambala_mangaluru/1200/600', 
+    organizerName: 'Dakshina Kannada Kambala Samithi',
+    createdAt: '2024-08-01', averageRating: 4.9, price: 20,
+    ratings: [],
+    targetDistricts: ['Dakshina Kannada', 'Udupi']
+  },
+  { 
+    id: '8', name: 'Chitradurga Fort Heritage Walk', nameKa: 'ಚಿತ್ರದುರ್ಗ ಕೋಟೆ ಪಾರಂಪರಿಕ ನಡಿಗೆ',
+    description: 'Explore the historic Chitradurga Fort with an expert guide. Learn about its rich history, architecture, and legendary tales. Suitable for all ages.', 
+    descriptionKa: 'ಪರಿಣಿತ ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಐತಿಹಾಸಿಕ ಚಿತ್ರದುರ್ಗ ಕೋಟೆಯನ್ನು ಅನ್ವೇಷಿಸಿ. ಅದರ ಶ್ರೀಮಂತ ಇತಿಹಾಸ, ವಾಸ್ತುಶಿಲ್ಪ ಮತ್ತು ಪೌರಾಣಿಕ ಕಥೆಗಳ ಬಗ್ಗೆ ತಿಳಿಯಿರಿ. ಎಲ್ಲಾ ವಯಸ್ಸಿನವರಿಗೆ ಸೂಕ್ತವಾಗಿದೆ.',
+    date: '2024-11-10', time: '07:00 AM', endTime: '10:00 AM',
+    locationName: 'Chitradurga Fort Main Entrance', address: 'Chitradurga Fort, Chitradurga, Karnataka 577501', 
+    district: 'Chitradurga', city: 'Chitradurga', taluk: 'Chitradurga', pinCode: '577501',
+    latitude: 14.2239, longitude: 76.3988, googleMapsUrl: 'https://maps.google.com/?q=14.2239,76.3988', localLandmark: 'Near Fort Entrance Ticket Counter',
+    category: 'Heritage Walk', language: 'Bilingual', culturalRelevance: ['Other Festival'],
+    imageUrl: 'https://picsum.photos/seed/chitradurga_walk/1200/600', 
+    organizerName: 'Karnataka Tourism Department & Local Historians',
+    createdAt: '2024-07-20', averageRating: 4.6, price: 100, registrationUrl: 'https://example.com/chitradurga-walk-register',
+    ratings: [] 
+  },
+];

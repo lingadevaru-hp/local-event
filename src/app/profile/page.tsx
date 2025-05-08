@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,7 +21,7 @@ let MOCK_USER_PROFILES: Record<string, User> = {};
 
 
 export default function ProfilePage() {
-  const { currentUser, loading: authLoading, logout } = useAuth();
+  const { currentUser, loading: authLoading, logout, updateUserProfile: authUpdateUserProfile } = useAuth();
   const router = useRouter();
   
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -35,7 +36,7 @@ export default function ProfilePage() {
   const [dob, setDob] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [district, setDistrict] = useState<KarnatakaDistrict | ''>('');
-  const [city, setCity] = useState<KarnatakaCity | ''>('');
+  const [city, setCity] = useState<KarnatakaCity | 'Other' | ''>(''); // Allow 'Other'
   const [customCity, setCustomCity] = useState('');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference | ''>('');
   const [collegeOrInstitution, setCollegeOrInstitution] = useState('');
@@ -66,7 +67,7 @@ export default function ProfilePage() {
         setDob(profileData.dob || '');
         setPhoneNumber(profileData.phoneNumber || '');
         setDistrict(profileData.district || '');
-        setCity(profileData.customCity ? 'Other' : (profileData.city || ''));
+        setCity(profileData.customCity ? 'Other' : (profileData.city as KarnatakaCity | 'Other' | '') || '');
         setCustomCity(profileData.customCity || '');
         setLanguagePreference(profileData.languagePreference || 'English');
         setCollegeOrInstitution(profileData.collegeOrInstitution || '');
@@ -93,6 +94,11 @@ export default function ProfilePage() {
         toast({ title: "Missing Required Fields", description: "Name, District, and Language Preference are required.", variant: "destructive"});
         return;
     }
+    if (city === 'Other' && !customCity) {
+        toast({ title: "Missing Required Fields", description: "Please specify your city/town if 'Other' is selected.", variant: "destructive"});
+        return;
+    }
+
 
     setIsSaving(true);
     
@@ -103,7 +109,7 @@ export default function ProfilePage() {
       dob: dob || undefined,
       phoneNumber: phoneNumber || undefined,
       district: district as KarnatakaDistrict,
-      city: city === 'Other' ? undefined : (city || undefined),
+      city: city === 'Other' ? undefined : (city as KarnatakaCity | undefined),
       customCity: city === 'Other' ? (customCity || undefined) : undefined,
       languagePreference: languagePreference as LanguagePreference,
       collegeOrInstitution: collegeOrInstitution || undefined,
@@ -116,8 +122,8 @@ export default function ProfilePage() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     MOCK_USER_PROFILES[currentUser.id] = updatedUserData;
     setUserProfile(updatedUserData); 
-    // Update localStorage if used for session persistence by AuthContext
-    localStorage.setItem('currentUser', JSON.stringify(updatedUserData));
+    // Update user in AuthContext and localStorage
+    authUpdateUserProfile(updatedUserData);
     
     toast({ title: 'Profile Updated!', description: 'Your profile information has been saved.' });
     setIsSaving(false);
@@ -176,11 +182,11 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <Label htmlFor="edit-city">City/Town (Karnataka)</Label>
-                  <Select value={city} onValueChange={v => setCity(v as KarnatakaCity)} disabled={isSaving || !district}>
+                  <Select value={city} onValueChange={v => setCity(v as KarnatakaCity | 'Other')} disabled={isSaving || !district}>
                     <SelectTrigger><SelectValue placeholder="Select city/town" /></SelectTrigger>
                     <SelectContent>
                         {KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        <SelectItem value="Other">Other (Please specify)</SelectItem>
+                        <SelectItem key="city-profile-other" value="Other">Other (Please specify)</SelectItem>
                     </SelectContent>
                   </Select>
                   {city === 'Other' && <Input type="text" placeholder="Enter your city/town" value={customCity} onChange={e => setCustomCity(e.target.value)} className="mt-2" disabled={isSaving}/>}
