@@ -4,10 +4,18 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { ThemeProvider } from '@/components/providers';
+import { ThemeProvider } from '@/components/theme-provider';
+import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import dynamic from 'next/dynamic'; // Import dynamic
+
+// Dynamically import SpeedInsights for client-side rendering and to handle potential load issues
+// Added SpeedInsights for performance monitoring; dynamically imported to prevent runtime errors.
+const SpeedInsightsDynamic = dynamic(
+  () => import('@vercel/speed-insights/next').then(mod => mod.SpeedInsights),
+  { ssr: false, loading: () => null } // Using null for loading, can be a custom component e.g. <div>Loading Speed Insights...</div>
+);
 
 export const metadata: Metadata = {
   title: 'Local Pulse Karnataka - Discover Events',
@@ -16,7 +24,7 @@ export const metadata: Metadata = {
   applicationName: "Local Pulse KA",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent", // Changed for Apple feel
+    statusBarStyle: "black-translucent",
     title: "Local Pulse KA",
   },
   formatDetection: {
@@ -65,15 +73,15 @@ export default function RootLayout({
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       appearance={{
         variables: {
-          colorPrimary: 'hsl(var(--primary))', // Apple Blue
+          colorPrimary: 'hsl(var(--primary))', 
           colorText: 'hsl(var(--foreground))',
           colorBackground: 'hsl(var(--background))',
           colorInputBackground: 'hsl(var(--input))',
           colorInputText: 'hsl(var(--foreground))',
-          borderRadius: '0.75rem', // More rounded like Apple UI
+          borderRadius: '0.75rem', 
         },
         elements: {
-          card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md', // Glassmorphism hint
+          card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md glassmorphism', 
           formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg py-2.5 text-base transition-transform hover:scale-105 active:scale-95 shadow-md',
           socialButtonsBlockButton: 'rounded-lg border-border/50',
           footerActionLink: 'text-primary hover:text-primary/90',
@@ -85,17 +93,17 @@ export default function RootLayout({
     >
       <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <head>
-          {/* PWA meta tags from manifest are usually sufficient, but some can be reiterated */}
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="Local Pulse KA" />
           <meta name="format-detection" content="telephone=no" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="msapplication-config" content="/icons/browserconfig.xml" />
-          <meta name="msapplication-TileColor" content="#007AFF" /> {/* Apple Blue */}
+          <meta name="msapplication-TileColor" content="#007AFF" /> 
           <meta name="msapplication-tap-highlight" content="no" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
+          <AuthProvider>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               <div className="relative flex min-h-screen flex-col">
                 <SiteHeader />
@@ -106,8 +114,10 @@ export default function RootLayout({
                 <BottomNavigationBar />
               </div>
               <Toaster />
-              <SpeedInsights />
             </ThemeProvider>
+          </AuthProvider>
+          {/* Conditionally render SpeedInsights for production after other primary components */}
+          {process.env.NODE_ENV === 'production' && <SpeedInsightsDynamic />}
         </body>
       </html>
     </ClerkProvider>
