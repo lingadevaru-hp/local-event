@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,29 +8,19 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Edit3, UserCircle } from 'lucide-react'; // Added UserCircle
+import { Loader2, Save, Edit3, UserCircle, ArrowLeft } from 'lucide-react';
 import { KARNATAKA_DISTRICTS, KARNATAKA_CITIES, LANGUAGE_PREFERENCES, USER_INTERESTS, type User, type KarnatakaDistrict, type KarnatakaCity, type LanguagePreference, type UserInterest } from '@/types/event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-// import { doc, getDoc, setDoc } from 'firebase/firestore'; // Firestore imports for profile data
-// import { firestore } from '@/lib/firebase'; // Firestore instance
+import Link from 'next/link';
 
-const createInitialUserDataFromAuth = (firebaseUser: import('firebase/auth').User): User => {
-  return {
-    id: firebaseUser.uid,
-    name: firebaseUser.displayName || '',
-    username: firebaseUser.displayName?.replace(/\s+/g, '').toLowerCase() || firebaseUser.email?.split('@')[0] || 'user',
-    email: firebaseUser.email || '',
-    photoURL: firebaseUser.photoURL || undefined,
-    languagePreference: 'English', // Default
-    createdAt: firebaseUser.metadata.creationTime || new Date().toISOString(),
-  };
-};
+// Mock data storage for user profiles (replace with backend in real app)
+let MOCK_USER_PROFILES: Record<string, User> = {};
 
 
 export default function ProfilePage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -54,47 +43,30 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
-      router.push('/login');
+      router.push('/login?redirect=/profile');
       return;
     }
 
-    if (currentUser && !userProfile) { // Fetch or initialize profile only once
+    if (currentUser && !userProfile) { 
       const fetchUserProfile = async () => {
         setIsLoadingProfile(true);
-        // TODO: Implement actual Firestore fetch
-        // const userDocRef = doc(firestore, 'users', currentUser.uid);
-        // const userDocSnap = await getDoc(userDocRef);
-
-        let profileData: User;
-        // if (userDocSnap.exists()) {
-        //   profileData = userDocSnap.data() as User;
-        //   // Ensure core auth fields are up-to-date
-        //   profileData.name = currentUser.displayName || profileData.name;
-        //   profileData.email = currentUser.email || profileData.email;
-        //   profileData.photoURL = currentUser.photoURL || profileData.photoURL;
-        // } else {
-          // New user or no profile in Firestore yet, create from auth
-          profileData = createInitialUserDataFromAuth(currentUser);
-          // Optionally, save this initial profile to Firestore immediately
-          // await setDoc(userDocRef, profileData); 
-        // }
+        // Simulate fetching profile from our mock store or use currentUser directly
+        let profileData = MOCK_USER_PROFILES[currentUser.id] || currentUser;
         
-        // Mocking profile data fetch for now
-        await new Promise(resolve => setTimeout(resolve, 500));
-        profileData = createInitialUserDataFromAuth(currentUser); 
-        // Add some mock details if desired for new users for testing
-        // profileData.district = 'Bengaluru Urban'; 
-        // profileData.languagePreference = 'English';
+        // If not in mock store, add it (could happen if user logged in via OTP without prior full registration)
+        if (!MOCK_USER_PROFILES[currentUser.id]) {
+            MOCK_USER_PROFILES[currentUser.id] = profileData;
+        }
 
         setUserProfile(profileData);
         
         // Initialize form fields
-        setName(profileData.name);
+        setName(profileData.name || ''); // currentUser.name is from AuthContext
         setGender(profileData.gender || '');
         setDob(profileData.dob || '');
         setPhoneNumber(profileData.phoneNumber || '');
         setDistrict(profileData.district || '');
-        setCity(profileData.city || '');
+        setCity(profileData.customCity ? 'Other' : (profileData.city || ''));
         setCustomCity(profileData.customCity || '');
         setLanguagePreference(profileData.languagePreference || 'English');
         setCollegeOrInstitution(profileData.collegeOrInstitution || '');
@@ -102,7 +74,7 @@ export default function ProfilePage() {
         setIsLoadingProfile(false);
       };
       fetchUserProfile();
-    } else if (!currentUser && !authLoading) { // Ensure profile loader stops if user logs out
+    } else if (!currentUser && !authLoading) { 
         setIsLoadingProfile(false);
     }
   }, [currentUser, authLoading, router, userProfile]);
@@ -117,32 +89,35 @@ export default function ProfilePage() {
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile || !currentUser) return;
+    if (!name || !district || !languagePreference) {
+        toast({ title: "Missing Required Fields", description: "Name, District, and Language Preference are required.", variant: "destructive"});
+        return;
+    }
 
     setIsSaving(true);
     
     const updatedUserData: User = {
-      ...userProfile,
+      ...userProfile, // Keep existing fields like id, email, createdAt
       name,
       gender: gender || undefined,
       dob: dob || undefined,
       phoneNumber: phoneNumber || undefined,
-      district: district || undefined,
+      district: district as KarnatakaDistrict,
       city: city === 'Other' ? undefined : (city || undefined),
       customCity: city === 'Other' ? (customCity || undefined) : undefined,
       languagePreference: languagePreference as LanguagePreference,
       collegeOrInstitution: collegeOrInstitution || undefined,
       interests: interests.length > 0 ? interests : undefined,
-      // Ensure core auth fields are preserved or updated if changed via Firebase Auth directly
+      // photoURL from Auth context might be from Google, etc. Retain it.
       photoURL: currentUser.photoURL || userProfile.photoURL, 
     };
 
-    // TODO: Implement actual Firestore save
-    // const userDocRef = doc(firestore, 'users', currentUser.uid);
-    // await setDoc(userDocRef, updatedUserData, { merge: true });
-    console.log("Saving user data (mock):", updatedUserData);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    // Simulate saving to backend/mock store
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    MOCK_USER_PROFILES[currentUser.id] = updatedUserData;
     setUserProfile(updatedUserData); 
+    // Update localStorage if used for session persistence by AuthContext
+    localStorage.setItem('currentUser', JSON.stringify(updatedUserData));
     
     toast({ title: 'Profile Updated!', description: 'Your profile information has been saved.' });
     setIsSaving(false);
@@ -154,11 +129,16 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl px-4 py-12">
-      <Card className="shadow-xl">
-        <CardHeader className="text-center relative">
+    <div className="container mx-auto max-w-2xl px-4 py-8">
+       <div className="mb-6">
+        <Button variant="outline" asChild>
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+        </Button>
+      </div>
+      <Card className="shadow-xl rounded-lg">
+        <CardHeader className="text-center relative p-6">
           <Avatar className="mx-auto h-24 w-24 mb-4 border-2 border-primary">
-            <AvatarImage src={userProfile.photoURL || `https://picsum.photos/seed/${userProfile.username}/200/200`} alt={userProfile.name} data-ai-hint="profile large person"/>
+            <AvatarImage src={userProfile.photoURL || `https://picsum.photos/seed/${userProfile.id}/200/200`} alt={userProfile.name || 'User'} data-ai-hint="profile large person"/>
             <AvatarFallback className="text-3xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : <UserCircle className="h-12 w-12" />}</AvatarFallback>
           </Avatar>
           <CardTitle className="text-2xl font-bold">{userProfile.name || 'User Profile'}</CardTitle>
@@ -169,10 +149,9 @@ export default function ProfilePage() {
             </Button>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {isEditing ? (
             <form onSubmit={handleSaveChanges} className="space-y-6">
-              {/* Form fields as before, ensuring `disabled={isSaving}` */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label htmlFor="edit-name">Full Name *</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
                 <div>
@@ -190,7 +169,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-district">District (Karnataka) *</Label>
-                  <Select value={district} onValueChange={v => setDistrict(v as KarnatakaDistrict)} required disabled={isSaving}>
+                  <Select value={district} onValueChange={v => { setDistrict(v as KarnatakaDistrict); setCity(''); setCustomCity(''); }} required disabled={isSaving}>
                     <SelectTrigger><SelectValue placeholder="Select district" /></SelectTrigger>
                     <SelectContent>{KARNATAKA_DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                   </Select>
@@ -199,7 +178,10 @@ export default function ProfilePage() {
                   <Label htmlFor="edit-city">City/Town (Karnataka)</Label>
                   <Select value={city} onValueChange={v => setCity(v as KarnatakaCity)} disabled={isSaving || !district}>
                     <SelectTrigger><SelectValue placeholder="Select city/town" /></SelectTrigger>
-                    <SelectContent>{KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                        {KARNATAKA_CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        <SelectItem value="Other">Other (Please specify)</SelectItem>
+                    </SelectContent>
                   </Select>
                   {city === 'Other' && <Input type="text" placeholder="Enter your city/town" value={customCity} onChange={e => setCustomCity(e.target.value)} className="mt-2" disabled={isSaving}/>}
                 </div>
@@ -216,11 +198,11 @@ export default function ProfilePage() {
               </div>
               <div>
                 <Label>Interests</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto mt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto mt-1">
                   {USER_INTERESTS.map(interest => (
                     <div key={interest} className="flex items-center space-x-2">
                       <Checkbox id={`edit-interest-${interest.replace(/\s+/g, '-')}`} checked={interests.includes(interest)} onCheckedChange={() => handleInterestChange(interest)} disabled={isSaving}/>
-                      <Label htmlFor={`edit-interest-${interest.replace(/\s+/g, '-')}`} className="text-sm font-normal">{interest}</Label>
+                      <Label htmlFor={`edit-interest-${interest.replace(/\s+/g, '-')}`} className="text-sm font-normal cursor-pointer">{interest}</Label>
                     </div>
                   ))}
                 </div>
@@ -235,6 +217,7 @@ export default function ProfilePage() {
           ) : (
             <div className="space-y-4 text-sm">
               <ProfileDetail label="Full Name" value={userProfile.name} />
+              <ProfileDetail label="Email ID" value={userProfile.email} />
               <ProfileDetail label="Gender" value={userProfile.gender} />
               <ProfileDetail label="Date of Birth" value={userProfile.dob ? new Date(userProfile.dob).toLocaleDateString('en-IN') : undefined} />
               <ProfileDetail label="Phone Number" value={userProfile.phoneNumber} />
@@ -244,6 +227,9 @@ export default function ProfilePage() {
               <ProfileDetail label="College/Institution" value={userProfile.collegeOrInstitution} />
               <ProfileDetail label="Interests" value={userProfile.interests?.join(', ')} />
               <ProfileDetail label="Member Since" value={new Date(userProfile.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })} />
+              <Button variant="destructive" onClick={logout} className="w-full mt-6" disabled={isSaving}>
+                Log Out
+              </Button>
             </div>
           )}
         </CardContent>
@@ -253,11 +239,11 @@ export default function ProfilePage() {
 }
 
 function ProfileDetail({ label, value }: { label: string, value?: string }) {
-  if (value === undefined || value === null || value === '') return null;
+  if (value === undefined || value === null || value.trim() === '') return null;
   return (
-    <div className="flex justify-between border-b pb-2">
-      <span className="font-medium text-muted-foreground">{label}:</span>
-      <span className="text-foreground text-right">{value}</span>
+    <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b pb-3 pt-1">
+      <span className="font-medium text-muted-foreground mb-1 sm:mb-0">{label}:</span>
+      <span className="text-foreground sm:text-right">{value}</span>
     </div>
   );
 }

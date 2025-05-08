@@ -4,6 +4,7 @@
 
 body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  @apply text-base; /* Ensures a base font size for responsiveness */
 }
 
 @layer base {
@@ -107,4 +108,9 @@ body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Additional global styles for consistency if needed */
+.container {
+  @apply max-w-screen-xl; /* Or your preferred max width */
 }

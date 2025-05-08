@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,10 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, BarChart2, BellRing, UploadCloud, Link as LinkIcon } from 'lucide-react'; // Renamed Link to LinkIcon
+import { Loader2, PlusCircle, Edit, BarChart2, BellRing, UploadCloud, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import { KARNATAKA_DISTRICTS, EVENT_CATEGORIES, LANGUAGE_PREFERENCES, type KarnatakaDistrict, type EventCategory, type LanguagePreference, type Event } from '@/types/event';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // Mock existing events for the dashboard view
 const mockOrganizerEvents: Event[] = [
@@ -26,7 +26,8 @@ const mockOrganizerEvents: Event[] = [
     imageUrl: 'https://picsum.photos/seed/techsummit/600/400', 
     createdAt: '2024-07-01', price: 500,
     targetDistricts: ['Belagavi (Belgaum)', 'Dharwad', 'Vijayapura (Bijapur)'],
-    registrationUrl: 'https://example.com/techsummit-register'
+    registrationUrl: 'https://example.com/techsummit-register',
+    organizerId: 'mockUserId123', // Assuming this user created it
   },
 ];
 
@@ -49,19 +50,18 @@ export default function OrganizerDashboardPage() {
   const [posterEng, setPosterEng] = useState<File | null>(null);
   const [posterKa, setPosterKa] = useState<File | null>(null);
   const [registrationUrl, setRegistrationUrl] = useState('');
-  const [price, setPrice] = useState<number | ''>(''); // Allow empty string for input field
+  const [price, setPrice] = useState<number | ''>('');
 
-  const [isSubmitting, setIsSubmitting] = useState(false); // Renamed isLoading for clarity
-  const [myEvents, setMyEvents] = useState<Event[]>([]); // Initialize with empty or fetched events
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [myEvents, setMyEvents] = useState<Event[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
-      router.push('/login');
+      router.push('/login?redirect=/dashboard');
     } else if (currentUser) {
-      // TODO: Fetch events created by this currentUser from Firestore
-      // For now, using mockOrganizerEvents if they match a mock organizerId or show none
-      setMyEvents(mockOrganizerEvents.filter(event => event.organizerId === currentUser.uid || !event.organizerId)); // Simplified mock
+      // TODO: Fetch events created by this currentUser from a real backend
+      setMyEvents(mockOrganizerEvents.filter(event => event.organizerId === currentUser.id));
     }
   }, [currentUser, authLoading, router]);
 
@@ -80,6 +80,7 @@ export default function OrganizerDashboardPage() {
     }
     if (!currentUser) {
         toast({ title: "Not Authenticated", description: "Please log in to create an event.", variant: "destructive" });
+        router.push('/login?redirect=/dashboard');
         return;
     }
     setIsSubmitting(true);
@@ -92,20 +93,21 @@ export default function OrganizerDashboardPage() {
         name: eventName, 
         description, date, time, locationName, address,
         district: district as KarnatakaDistrict, 
-        city: city as any, 
+        city: city, // City is now a string
         latitude: 0, longitude: 0, // Placeholder, implement geocoding or manual input
         category: category as EventCategory, language: language as LanguagePreference,
         createdAt: new Date().toISOString(),
         targetDistricts,
         registrationUrl: registrationUrl || undefined,
-        price: typeof price === 'number' ? price : undefined, // Handle empty string for price
-        // Mock image URLs for now, replace with actual URLs after upload
+        price: typeof price === 'number' ? price : undefined,
         imageUrl: posterEng ? URL.createObjectURL(posterEng) : `https://picsum.photos/seed/${Date.now()}/600/400`,
         posterKaUrl: posterKa ? URL.createObjectURL(posterKa) : undefined,
-        organizerId: currentUser.uid,
-        organizerName: currentUser.displayName || currentUser.email || 'Organizer',
+        organizerId: currentUser.id,
+        organizerName: currentUser.name || currentUser.email || 'Organizer',
     };
     setMyEvents(prev => [newEvent, ...prev]);
+    // Add to global mock events for other pages to see during session
+    // MOCK_EVENTS_KARNATAKA.unshift(newEvent); //This can lead to issues if not managed well. Better to fetch from a "source of truth"
 
     toast({ title: 'Event Created!', description: `${eventName} has been successfully created.` });
     // Reset form
@@ -126,12 +128,15 @@ export default function OrganizerDashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Organizer Dashboard</h1>
+         <Button variant="outline" asChild>
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 shadow-xl">
+        <Card className="lg:col-span-2 shadow-xl rounded-lg">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center"><PlusCircle className="mr-2 h-6 w-6 text-accent" /> Create New Event</CardTitle>
             <CardDescription>Fill in the details for your event in Karnataka.</CardDescription>
@@ -139,7 +144,7 @@ export default function OrganizerDashboardPage() {
           <CardContent>
             <form onSubmit={handleCreateEvent} className="space-y-6">
               <div><Label htmlFor="eventName">Event Name *</Label><Input id="eventName" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g., Karnataka Tech Fest" required disabled={isSubmitting}/></div>
-              <div><Label htmlFor="description">Description *</Label><Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="Detailed description of the event..." required disabled={isSubmitting}/></div>
+              <div><Label htmlFor="description">Description *</Label><Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="Detailed description of the event..." required disabled={isSubmitting} rows={4}/></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label htmlFor="date">Date *</Label><Input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} required disabled={isSubmitting}/></div>
                 <div><Label htmlFor="time">Time *</Label><Input id="time" type="time" value={time} onChange={e => setTime(e.target.value)} required disabled={isSubmitting}/></div>
@@ -188,11 +193,11 @@ export default function OrganizerDashboardPage() {
 
               <div>
                 <Label>Target Districts for Notifications (Optional)</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto mt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto mt-1">
                     {KARNATAKA_DISTRICTS.map(d => (
                     <div key={d} className="flex items-center space-x-2">
-                        <input type="checkbox" id={`target-${d}`} checked={targetDistricts.includes(d)} onChange={() => handleTargetDistrictToggle(d)} className="form-checkbox h-4 w-4 text-primary rounded" disabled={isSubmitting}/>
-                        <Label htmlFor={`target-${d}`} className="text-sm font-normal">{d}</Label>
+                        <input type="checkbox" id={`target-${d.replace(/[^a-zA-Z0-9]/g, "")}`} checked={targetDistricts.includes(d)} onChange={() => handleTargetDistrictToggle(d)} className="form-checkbox h-4 w-4 text-primary rounded focus:ring-accent" disabled={isSubmitting}/>
+                        <Label htmlFor={`target-${d.replace(/[^a-zA-Z0-9]/g, "")}`} className="text-sm font-normal cursor-pointer">{d}</Label>
                     </div>
                     ))}
                 </div>
@@ -200,7 +205,7 @@ export default function OrganizerDashboardPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="posterEng">Poster (Main) <UploadCloud className="inline h-4 w-4 ml-1"/></Label>
+                    <Label htmlFor="posterEng">Poster (Main - English) <UploadCloud className="inline h-4 w-4 ml-1"/></Label>
                     <Input id="posterEng" type="file" onChange={e => setPosterEng(e.target.files ? e.target.files[0] : null)} accept="image/*" disabled={isSubmitting}/>
                 </div>
                  <div>
@@ -209,15 +214,15 @@ export default function OrganizerDashboardPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Create Event
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-3 text-base" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} Create Event
               </Button>
             </form>
           </CardContent>
         </Card>
 
         <div className="space-y-8">
-            <Card className="shadow-xl">
+            <Card className="shadow-xl rounded-lg">
                 <CardHeader>
                     <CardTitle className="text-xl flex items-center"><BarChart2 className="mr-2 h-5 w-5 text-accent" /> Event Analytics</CardTitle>
                     <CardDescription>View performance of your events. (District-wise breakdown coming soon)</CardDescription>
@@ -230,7 +235,7 @@ export default function OrganizerDashboardPage() {
                     </div>
                 </CardContent>
             </Card>
-             <Card className="shadow-xl">
+             <Card className="shadow-xl rounded-lg">
                 <CardHeader>
                     <CardTitle className="text-xl flex items-center"><BellRing className="mr-2 h-5 w-5 text-accent" /> Custom Notifications</CardTitle>
                     <CardDescription>Send updates to specific user groups or districts.</CardDescription>
@@ -253,16 +258,16 @@ export default function OrganizerDashboardPage() {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-2xl font-bold mb-4 text-primary flex items-center"><Edit className="mr-2 h-6 w-6" /> Manage Your Events</h2>
+        <h2 className="text-2xl font-bold mb-6 text-primary flex items-center"><Edit className="mr-2 h-6 w-6" /> Manage Your Events</h2>
         {myEvents.length > 0 ? (
             <div className="space-y-4">
                 {myEvents.map(event => (
-                    <Card key={event.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
-                        <div>
-                            <h3 className="font-semibold text-lg">{event.name}</h3>
+                    <Card key={event.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow rounded-lg">
+                        <div className="flex-grow mb-3 sm:mb-0">
+                            <h3 className="font-semibold text-lg text-foreground">{event.name}</h3>
                             <p className="text-sm text-muted-foreground">{event.district} - {new Date(event.date).toLocaleDateString('en-IN')}</p>
                         </div>
-                        <div className="mt-2 sm:mt-0 space-x-2">
+                        <div className="flex space-x-2 flex-shrink-0">
                             <Button variant="outline" size="sm"><Edit className="mr-1 h-3 w-3" /> Edit</Button>
                             <Button variant="outline" size="sm"><BarChart2 className="mr-1 h-3 w-3" /> Stats</Button>
                         </div>
@@ -270,7 +275,7 @@ export default function OrganizerDashboardPage() {
                 ))}
             </div>
         ) : (
-            <p className="text-muted-foreground">You haven&apos;t created any events yet.</p>
+            <p className="text-muted-foreground text-center py-4">You haven&apos;t created any events yet.</p>
         )}
       </div>
     </div>
