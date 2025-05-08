@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { ThemeProvider } from '@/components/providers';
-// import { AuthProvider } from '@/contexts/authContext'; // Removed: ClerkProvider will handle auth.
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
 import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
@@ -15,11 +14,11 @@ import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
 export const metadata: Metadata = {
   title: 'Local Pulse Karnataka - Discover Events',
   description: 'Find and review local events, Utsavas, college fests, and more across Karnataka. ನಿಮ್ಮ ಜಿಲ್ಲೆಯಲ್ಲಿ ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಹುಡುಕಿ ಮತ್ತು ವಿಮರ್ಶಿಸಿ.',
-  manifest: "/manifest.json",
+  manifest: "/manifest.json", // Essential for PWA
   applicationName: "Local Pulse KA",
-  appleWebApp: {
+  appleWebApp: { // iOS PWA settings
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "black-translucent", // Or 'default' or 'black'
     title: "Local Pulse KA",
   },
   formatDetection: {
@@ -30,30 +29,30 @@ export const metadata: Metadata = {
     siteName: "Local Pulse Karnataka",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
-    images: [{ url: '/icons/icon-512x512.png' }], // Ensure this path is correct
+    images: [{ url: '/icons/icon-512x512.png' }], 
   },
   twitter: {
     card: "summary_large_image",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
-    images: ['/icons/icon-512x512.png'], // Ensure this path is correct
+    images: ['/icons/icon-512x512.png'], 
   },
-  icons: [
-    { rel: "apple-touch-icon", sizes: "180x180", url: "/icons/apple-touch-icon.png" }, // Create these icons
+  icons: [ // Favicons and app icons
+    { rel: "apple-touch-icon", sizes: "180x180", url: "/icons/apple-touch-icon.png" }, 
     { rel: "icon", type: "image/png", sizes: "32x32", url: "/icons/favicon-32x32.png" },
     { rel: "icon", type: "image/png", sizes: "16x16", url: "/icons/favicon-16x16.png" },
-    { rel: "mask-icon", url: "/icons/safari-pinned-tab.svg", color: "#007AFF" }, // Create this SVG
+    { rel: "mask-icon", url: "/icons/safari-pinned-tab.svg", color: "#007AFF" }, 
   ],
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'hsl(var(--background))' },
-    { media: '(prefers-color-scheme: dark)', color: 'hsl(var(--background))' },
+  themeColor: [ // Theme color for browser UI
+    { media: '(prefers-color-scheme: light)', color: 'hsl(var(--background))' }, // Match your light theme
+    { media: '(prefers-color-scheme: dark)', color: 'hsl(var(--background))' }, // Match your dark theme
   ],
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Important for PWA-like feel, prevents zooming
+  maximumScale: 1, // Important for PWA-like feel, prevents zooming on mobile
   userScalable: false, // Important for PWA-like feel
   // viewportFit: "cover", // Optional: For edge-to-edge on iOS, test carefully
 };
@@ -109,7 +108,7 @@ export default function RootLayout({
           colorBackground: 'hsl(var(--background))',
           colorInputBackground: 'hsl(var(--input))',
           colorInputText: 'hsl(var(--foreground))',
-          borderRadius: '0.75rem', // Apple-like rounded corners from globals.css
+          borderRadius: 'var(--radius)', 
         },
         elements: {
           card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md glassmorphism',
@@ -124,19 +123,19 @@ export default function RootLayout({
     >
       <html lang="en" className={GeistSans.className} suppressHydrationWarning>
         <head>
-          {/* PWA specific meta tags */}
+          {/* PWA specific meta tags - already well covered by Metadata object above */}
+          {/* but some browsers might pick these up faster if directly in head */}
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="Local Pulse KA" />
           <meta name="format-detection" content="telephone=no" />
-          <meta name="mobile-web-app-capable" content="yes" />
-          <meta name="msapplication-config" content="/icons/browserconfig.xml" />
+          <meta name="mobile-web-app-capable" content="yes" /> {/* For older Android */}
+          <meta name="msapplication-config" content="/icons/browserconfig.xml" /> {/* For Windows tiles */}
           <meta name="msapplication-TileColor" content="#007AFF" /> 
           <meta name="msapplication-tap-highlight" content="no" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {/* Removed AuthProvider, ClerkProvider is now the primary auth handler */}
             <div className="relative flex min-h-screen flex-col">
               <SiteHeader />
               <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6">

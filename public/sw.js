@@ -1,14 +1,59 @@
+// Scripts for firebase and firebase messaging
+// It's important to use the same version of Firebase SDKs across your app and service worker.
+// Using 9.22.1 as per the original firebase-messaging-sw.js.
+importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'local-pulse-cache-v2'; // Increment version for updates
+// Initialize the Firebase app in the service worker with your Firebase project configuration
+// IMPORTANT: These %VAR_NAME% placeholders MUST be replaced with actual values during a build process
+// or by dynamically fetching the config if your setup allows.
+const firebaseConfig = {
+  apiKey: "%NEXT_PUBLIC_FIREBASE_API_KEY%",
+  authDomain: "%NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN%",
+  projectId: "%NEXT_PUBLIC_FIREBASE_PROJECT_ID%",
+  storageBucket: "%NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET%",
+  messagingSenderId: "%NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID%",
+  appId: "%NEXT_PUBLIC_FIREBASE_APP_ID%"
+};
+
+let app;
+if (firebase.apps.length === 0) {
+  app = firebase.initializeApp(firebaseConfig);
+} else {
+  app = firebase.app();
+}
+
+let messaging;
+if (firebase.messaging.isSupported() && app) {
+  messaging = firebase.messaging(app);
+
+  // Handle background messages for FCM
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[Service Worker] Received Firebase background message ', payload);
+    
+    const notificationTitle = payload.notification?.title || "New Notification";
+    const notificationOptions = {
+      body: payload.notification?.body || "You have a new update.",
+      icon: payload.notification?.icon || '/icons/icon-192x192.png', // Default icon
+      data: payload.data // This will contain any data sent with the notification
+    };
+
+    self.registration.showNotification(notificationTitle, notificationOptions);
+  });
+} else {
+    console.log('[Service Worker] Firebase Messaging is not supported or Firebase app not initialized.');
+}
+
+
+const CACHE_NAME = 'local-pulse-cache-v3'; // Increment version for updates
 const urlsToCache = [
   '/',
   '/manifest.json',
-  // Next.js static assets are typically versioned, making them hard to list statically.
-  // Consider using Workbox for more robust caching in a real app.
-  // For now, we'll cache main entry points and rely on browser caching for versioned assets.
+  '/offline.html', // Ensure offline page is cached
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   // Add other critical static assets if any (e.g., global CSS, fonts not handled by Next.js optimization)
+  // Next.js static assets (_next/static/*) are typically versioned and handled by runtime caching.
 ];
 
 self.addEventListener('install', event => {
@@ -17,9 +62,8 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[Service Worker] Caching app shell');
-        // Use "no-cache" to ensure fresh resources during install, especially for manifest.json
         const cachePromises = urlsToCache.map(urlToCache => {
-          return cache.add(new Request(urlToCache, {cache: 'reload'}));
+          return cache.add(new Request(urlToCache, {cache: 'reload'})); // Fetch fresh resources during install
         });
         return Promise.all(cachePromises);
       })
@@ -27,7 +71,7 @@ self.addEventListener('install', event => {
         console.error('[Service Worker] Cache add failed during install:', error);
       })
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Activate new service worker immediately
 });
 
 self.addEventListener('activate', event => {
@@ -45,12 +89,10 @@ self.addEventListener('activate', event => {
       );
     })
   );
-  return self.clients.claim();
+  return self.clients.claim(); // Take control of uncontrolled clients
 });
 
 self.addEventListener('fetch', event => {
-  // console.log('[Service Worker] Fetching:', event.request.url);
-
   // For navigation requests (HTML pages), try network first, then cache, then offline page.
   if (event.request.mode === 'navigate') {
     event.respondWith(
@@ -58,8 +100,20 @@ self.addEventListener('fetch', event => {
         .then(response => {
           // Check if we received a valid response
           if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response; // Potentially an error page from the server
+            // If fetch fails (e.g. network error) or returns an error page, try cache.
+            // This 'return response' was problematic if it was e.g. a 404 from network.
+            // Instead, we should catch the fetch error and then try cache.
+             console.log('[Service Worker] Network request for navigation failed or returned non-200 for:', event.request.url, response?.status);
+             // Fall through to catch block for non-successful network responses.
+             if (response && response.ok) { // Only cache good responses
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put(event.request, responseToCache);
+                });
+             }
+             return response;
           }
+          // If successful, cache and return the response
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseToCache);
@@ -67,7 +121,8 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => {
-          // Network failed, try to serve from cache
+          // Network failed or returned non-OK, try to serve from cache
+          console.log('[Service Worker] Network fetch failed for navigation, trying cache for:', event.request.url);
           return caches.match(event.request)
             .then(cachedResponse => {
               return cachedResponse || caches.match('/offline.html'); // Fallback to offline page
@@ -82,15 +137,16 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(response => {
         if (response) {
-          // console.log('[Service Worker] Returning from cache:', event.request.url);
-          return response;
+          return response; // Return from cache
         }
-        // console.log('[Service Worker] Fetching from network:', event.request.url);
+        // Not in cache, fetch from network
         return fetch(event.request).then(
           networkResponse => {
-            if (!networkResponse || networkResponse.status !== 200) { // Don't cache opaque responses or errors
+            // Check if we received a valid response
+            if (!networkResponse || networkResponse.status !== 200 ) { // Don't cache opaque responses or errors without `type: 'basic'`
               return networkResponse;
             }
+            // If successful, cache and return the response
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME)
               .then(cache => {
@@ -99,16 +155,17 @@ self.addEventListener('fetch', event => {
             return networkResponse;
           }
         ).catch(error => {
-          console.error('[Service Worker] Fetch failed for non-navigate:', event.request.url, error);
-          // For non-critical assets, failing is okay, browser will show broken image/style.
-          // You could return a placeholder for images if desired.
+          console.error('[Service Worker] Fetch failed for non-navigate asset:', event.request.url, error);
+          // For non-critical assets like images, you might want to return a placeholder if not cached.
+          // For JS/CSS, if not cached and network fails, it will likely break the page.
+          // The offline.html fallback is primarily for navigation.
         });
       })
   );
 });
 
 
-// Listener for push notifications
+// Generic push listener (can be triggered by FCM or other push services)
 self.addEventListener('push', event => {
   console.log('[Service Worker] Push Received.');
   const pushData = event.data ? event.data.json() : {};
@@ -117,18 +174,12 @@ self.addEventListener('push', event => {
   const options = {
     body: pushData.body || 'Something new happened!',
     icon: pushData.icon || '/icons/icon-192x192.png',
-    badge: pushData.badge || '/icons/icon-96x96.png', // Small icon for notification bar
-    vibrate: pushData.vibrate || [200, 100, 200], // Vibration pattern
+    badge: pushData.badge || '/icons/icon-96x96.png', 
+    vibrate: pushData.vibrate || [200, 100, 200], 
     data: {
-      url: pushData.url || '/', // URL to open on click
-      eventId: pushData.eventId, // Custom data
-      ...pushData.data // any other custom data
+      url: pushData.url || '/', 
+      ...pushData.data 
     },
-    // Actions (buttons) for notifications - Example
-    // actions: [
-    //   { action: 'explore', title: 'Explore', icon: '/icons/action-explore.png' },
-    //   { action: 'close', title: 'Close', icon: '/icons/action-close.png' },
-    // ]
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -140,91 +191,22 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
   
   const notificationData = event.notification.data;
-  const urlToOpen = notificationData.url || '/';
+  // Try to get URL from standard payload.data.url or FCM specific paths
+  const urlToOpen = notificationData?.url || notificationData?.FCM_MSG?.data?.url || '/';
 
-  // if (event.action === 'explore' && notificationData.eventId) {
-  //   clients.openWindow(`/events/${notificationData.eventId}`);
-  // } else 
-  if (event.action === 'close') {
-    // Do nothing, notification is already closed
-  } else {
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-        for (let i = 0; i < windowClients.length; i++) {
-          const client = windowClients[i];
-          if (client.url === urlToOpen && 'focus' in client) {
-            return client.focus();
-          }
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // Check if a window is already open at the target URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
         }
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-    );
-  }
+      }
+      // If not, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
-
-// This is for Firebase Cloud Messaging when the app is in the background or closed.
-// It needs to be in a separate file `firebase-messaging-sw.js` in the public directory.
-// However, since sw.js is the main service worker, we can try to import and initialize firebase here
-// if firebase-messaging-sw.js is not used. This is generally not recommended.
-// The typical setup is:
-// 1. sw.js for PWA caching and generic push.
-// 2. firebase-messaging-sw.js specifically for FCM background messages.
-// For simplicity in this context, I'm putting FCM listener here, but it might need firebase-app.js and firebase-messaging.js.
-// If using Firebase, ensure you initialize it:
-/*
-importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js');
-
-const firebaseConfig = {
-  // Your Firebase config object from the Firebase console
-  // apiKey: "...",
-  // authDomain: "...",
-  // projectId: "...",
-  // storageBucket: "...",
-  // messagingSenderId: "...", // This is crucial for FCM
-  // appId: "...",
-};
-
-if (firebase.apps.length === 0) {
-  firebase.initializeApp(firebaseConfig);
-}
-
-let messaging;
-if (firebase.messaging.isSupported()) {
-   messaging = firebase.messaging();
-   messaging.onBackgroundMessage((payload) => {
-    console.log('[firebase-messaging-sw.js] Received background message ', payload);
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-      body: payload.notification.body,
-      icon: payload.notification.image, // Or a default icon
-    };
-    self.registration.showNotification(notificationTitle, notificationOptions);
-  });
-}
-*/
-// For now, the generic push listeners above will handle notifications if sent via Web Push protocol.
-// FCM specific background handling usually requires its own setup as hinted above.
-// The current project uses `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, which implies FCM is intended.
-// A `public/firebase-messaging-sw.js` would be the standard way.
-
-// Placeholder for offline page. Create this file in public directory.
-// public/offline.html
-// <!DOCTYPE html>
-// <html>
-// <head>
-//   <title>Offline - Local Pulse</title>
-//   <meta name="viewport" content="width=device-width, initial-scale=1">
-//   <style>
-//     body { font-family: sans-serif; text-align: center; padding: 20px; }
-//     h1 { color: #3498db; }
-//   </style>
-// </head>
-// <body>
-//   <h1>You are offline</h1>
-//   <p>Please check your internet connection and try again.</p>
-//   <p><a href="/">Try to Reload</a></p>
-// </body>
-// </html>
