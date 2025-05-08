@@ -7,7 +7,7 @@ import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; // Using mock data for now
 import Image from 'next/image';
 import Link from 'next/link';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, Pagination, NavigationEffectFade } from 'swiper/modules'; // Corrected NavigationEffectFade to EffectFade
+import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
@@ -33,7 +33,7 @@ export function FeaturedEventsCarousel() {
     <section className="mb-12">
       <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary">Featured Events</h2>
       <Swiper
-        modules={[Autoplay, Pagination, NavigationEffectFade]} // Corrected: Navigation
+        modules={[Autoplay, Pagination, Navigation, EffectFade]}
         spaceBetween={20}
         slidesPerView={1}
         loop={true}
@@ -50,7 +50,7 @@ export function FeaturedEventsCarousel() {
         fadeEffect={{ crossFade: true }}
         className="relative rounded-xl shadow-xl overflow-hidden group"
       >
-        {featuredEvents.map((event) => (
+        {featuredEvents.map((event, index) => ( // Added index for priority
           <SwiperSlide key={event.id}>
             <Link href={`/events/${event.id}`} className="block aspect-[16/9] md:aspect-[21/9] w-full h-full relative">
               <Image
@@ -59,7 +59,7 @@ export function FeaturedEventsCarousel() {
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
-                priority={featuredEvents.indexOf(event) === 0} // Prioritize first image
+                priority={index === 0} // Prioritize first image
                 data-ai-hint="featured event banner"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-6 md:p-10 flex flex-col justify-end">
@@ -99,3 +99,4 @@ export function FeaturedEventsCarousel() {
     </section>
   );
 }
+

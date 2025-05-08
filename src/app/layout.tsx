@@ -5,7 +5,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeProvider } from '@/components/providers'; // Updated import path
 import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [ 
-    { media: '(prefers-color-scheme: light)', color: 'hsl(240 5% 96%)' }, // Updated to new light theme background
-    { media: '(prefers-color-scheme: dark)', color: 'hsl(240 6% 10%)' }, // Updated to new dark theme background
+    { media: '(prefers-color-scheme: light)', color: 'hsl(var(--background))' }, 
+    { media: '(prefers-color-scheme: dark)', color: 'hsl(var(--background))' },
   ],
   width: "device-width",
   initialScale: 1,
@@ -59,10 +59,23 @@ export default function RootLayout({
   return (
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      appearance={{
+        variables: {
+          colorPrimary: 'hsl(var(--primary))',
+          colorText: 'hsl(var(--foreground))',
+          colorBackground: 'hsl(var(--background))',
+          colorInputBackground: 'hsl(var(--input))',
+          colorInputText: 'hsl(var(--foreground))',
+        },
+        elements: {
+          card: 'shadow-xl rounded-lg border-border bg-card',
+          formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+          footerActionLink: 'text-primary hover:text-primary/90',
+        }
+      }}
     >
       <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <head>
-          {/* Standard PWA meta tags */}
           <meta name="application-name" content="Local Pulse KA" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -75,9 +88,7 @@ export default function RootLayout({
           
           <link rel="manifest" href="/manifest.json" />
           
-          {/* Theme color for browser UI */}
-          <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)" />
-          <meta name="theme-color" content="#1D1D1F" media="(prefers-color-scheme: dark)" />
+          <meta name="theme-color" content="hsl(var(--background))" />
 
           <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
           <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
@@ -88,12 +99,11 @@ export default function RootLayout({
           <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground">
-          {/* AuthProvider might be redundant if Clerk handles all user state, review if needed later */}
           <AuthProvider> 
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               <div className="relative flex min-h-screen flex-col">
                 <SiteHeader />
-                <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6"> {/* Added padding top and horizontal padding */}
+                <main className="flex-1 pb-20 sm:pb-0 pt-4 px-2 md:px-4 lg:px-6">
                   {children}
                 </main>
                 <SiteFooter />
