@@ -15,6 +15,7 @@ import { EventCard } from '@/components/event-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+console.log('Homepage (page.tsx) script start');
 
 const headlineVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -32,24 +33,30 @@ const buttonVariants = {
 };
 
 const EventCardSkeleton = () => (
-  <div className="bg-card/50 backdrop-blur-sm border border-border/20 rounded-xl shadow-lg overflow-hidden p-4 glassmorphism animate-pulse">
-    <Skeleton className="h-40 w-full rounded-md mb-4 bg-muted/30" />
-    <Skeleton className="h-6 w-3/4 bg-muted/30 rounded-md mb-2" />
-    <Skeleton className="h-4 w-1/2 bg-muted/30 rounded-md" />
+  <div className="bg-card/50 backdrop-blur-sm border border-border/20 rounded-2xl shadow-lg overflow-hidden animate-pulse p-4 glassmorphism flex flex-col">
+    <div className="aspect-[16/10] bg-muted/40 rounded-xl mb-4"></div> {/* Image placeholder */}
+    <div className="space-y-3 flex-grow">
+      <div className="h-6 w-4/5 bg-muted/30 rounded-md"></div> {/* Title placeholder */}
+      <div className="h-4 w-3/5 bg-muted/20 rounded-md"></div> {/* Date/Time placeholder */}
+      <div className="h-4 w-4/6 bg-muted/20 rounded-md"></div> {/* Location placeholder */}
+    </div>
+    <div className="flex justify-between items-center pt-4 mt-auto">
+      <div className="h-5 w-1/3 bg-muted/20 rounded-md"></div> {/* Rating placeholder */}
+      <div className="h-9 w-1/4 bg-muted/30 rounded-lg"></div> {/* Button placeholder */}
+    </div>
   </div>
 );
 
-
 export default function HomePage() {
-  const { isSignedIn, isLoaded: isClerkLoaded, user } = useUser();
+  console.log('HomePage component mounting/rendering...');
+  const { user, isSignedIn, isLoaded: isClerkLoaded } = useUser();
   const [recentEvents, setRecentEvents] = useState<EventType[]>([]);
-  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true); // Start with loading true
   const [eventError, setEventError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
 
-  // Debug: Log Clerk loading state
   useEffect(() => {
-    console.log("Clerk isLoaded state:", isClerkLoaded);
+    console.log("Clerk isLoaded state in HomePage:", isClerkLoaded);
     if(isClerkLoaded && isSignedIn) {
       console.log("User is signed in:", user?.id);
     } else if (isClerkLoaded && !isSignedIn) {
@@ -57,18 +64,15 @@ export default function HomePage() {
     }
   }, [isClerkLoaded, isSignedIn, user]);
 
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsOnline(navigator.onLine);
       const handleOnline = () => {
         console.log("App came online.");
         setIsOnline(true);
-        setEventError(null); 
-        // Re-fetch data if coming back online and there was a network error previously
-        if (eventError && eventError.includes("network")) {
-          // Logic to re-trigger event fetch could be added here if desired
-          // For now, let the main event fetching useEffect handle it based on isOnline state.
+        if (eventError && (eventError.includes("offline") || eventError.includes("network"))) {
+          setEventError(null); 
+          // Optionally re-fetch events
         }
       };
       const handleOffline = () => {
@@ -87,27 +91,28 @@ export default function HomePage() {
   }, [eventError]);
 
   useEffect(() => {
+    console.log("HomePage: Attempting to fetch recent events. Firestore available:", !!firestore, "Online:", isOnline);
     if (!isOnline) {
-      setIsLoadingEvents(false); // Error is already set by online/offline listener
-      return () => {}; // No cleanup needed for this path
+      setEventError("You are offline. Cannot fetch events.");
+      setIsLoadingEvents(false);
+      return;
     }
     if (!firestore) {
-       setEventError("Database service is currently unavailable. Recent events might not load. Please try again later.");
+       setEventError("Database service is currently unavailable. Recent events might not load.");
        setIsLoadingEvents(false);
-       console.warn("Firestore not available for recent events fetch.");
-       return () => {}; // No cleanup needed
+       console.warn("Firestore not available for recent events fetch in HomePage.");
+       return;
     }
 
     setIsLoadingEvents(true);
     setEventError(null);
-    console.log("Attempting to fetch recent events from Firestore...");
+    console.log("HomePage: Setting up Firestore listener for recent events...");
 
     const eventsCollectionRef = collection(firestore, 'events');
-    // Reduced limit for faster initial load during debugging/testing
     const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(3)); 
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      console.log("Recent events snapshot received:", querySnapshot.size, "documents");
+      console.log("HomePage: Recent events snapshot received:", querySnapshot.size, "documents");
       const eventsData: EventType[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -122,27 +127,29 @@ export default function HomePage() {
       setRecentEvents(eventsData);
       setEventError(null); 
       setIsLoadingEvents(false);
+      console.log("HomePage: Recent events updated, loading finished.");
     }, (error) => {
-      console.error("Error fetching recent events from Firestore:", error);
+      console.error("HomePage: Error fetching recent events from Firestore:", error);
       setEventError("Failed to load recent events. Please try again or check your connection.");
       setIsLoadingEvents(false);
     });
 
     const loadTimer = setTimeout(() => {
-      if (isLoadingEvents) {
-        console.warn("Recent events loading timed out (20s).");
-        setEventError("Loading events is taking longer than usual. Please ensure you have a stable internet connection or try refreshing the page.");
-        setIsLoadingEvents(false); // Stop showing skeleton if timeout
+      if (isLoadingEvents) { // Check isLoadingEvents state, not just a generic loading variable
+        console.warn("HomePage: Recent events loading timed out (15s).");
+        if (!eventError) { // Only set timeout error if no other error (like offline) has been set
+            setEventError("Loading events is taking longer than usual. Please check your internet connection or try refreshing.");
+        }
+        setIsLoadingEvents(false);
       }
-    }, 20000); 
+    }, 15000); 
 
     return () => {
-      console.log("Unsubscribing from recent events snapshot.");
+      console.log("HomePage: Unsubscribing from recent events snapshot.");
       unsubscribe();
       clearTimeout(loadTimer);
     };
   }, [isOnline]); 
-
   
   const renderHeroSection = () => (
     <section className="w-full py-16 md:py-24 text-center relative overflow-hidden bg-card/50 glassmorphism-light dark:glassmorphism-dark rounded-xl shadow-xl mb-10">
@@ -163,7 +170,7 @@ export default function HomePage() {
             : (isSignedIn && isClerkLoaded ? "Explore events, manage your watchlist, or create your own!" : "Authenticating your experience...")
             }
         </motion.p>
-        {!isSignedIn && isClerkLoaded && ( // Only show if Clerk is loaded and user is not signed in
+        {!isSignedIn && isClerkLoaded && (
             <motion.div 
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
             initial="hidden" animate="visible" variants={buttonVariants}
@@ -191,8 +198,7 @@ export default function HomePage() {
     </section>
   );
 
-  // Main loading state: Covers Clerk initialization and initial online check
-  if (!isClerkLoaded) {
+  if (!isClerkLoaded && !eventError) { // Show main loader only if Clerk is still loading and no other critical error
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
@@ -212,12 +218,12 @@ export default function HomePage() {
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary tracking-tight">
             Recent Events
           </h2>
-          {isLoadingEvents && !eventError && ( // Show skeletons only if actively loading events and no general error
+          {isLoadingEvents && !eventError && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {[...Array(3)].map((_, i) => <EventCardSkeleton key={i} />)}
+              {[...Array(3)].map((_, i) => <EventCardSkeleton key={`skeleton-${i}`} />)}
             </div>
           )}
-          {eventError && ( // Display event-specific or general errors
+          {eventError && (
              <Alert variant="destructive" className="my-8">
               {eventError.includes("offline") || eventError.includes("network") ? <WifiOff className="h-5 w-5" /> : <ServerCrash className="h-5 w-5" />}
               <AlertTitle>{eventError.includes("offline") || eventError.includes("network") ? "Network Issue" : "Error Loading Events"}</AlertTitle>
