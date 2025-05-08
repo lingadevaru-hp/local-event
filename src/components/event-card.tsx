@@ -1,3 +1,4 @@
+
 import type { Event } from '@/types/event';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ export function EventCard({ event }: EventCardProps) {
 
   const handleVibrate = () => {
     if (typeof window !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(10); // Softer vibration
+      navigator.vibrate(10); 
     }
   };
 
@@ -27,9 +28,11 @@ export function EventCard({ event }: EventCardProps) {
     <Card 
       className="overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col h-full bg-card/70 glassmorphism rounded-2xl border-border/30 group"
       onClick={handleVibrate}
+      role="article"
+      aria-labelledby={`event-title-${event.id}`}
     >
       <CardHeader className="p-0 relative">
-        <Link href={`/events/${event.id}`} className="block aspect-[16/10] overflow-hidden rounded-t-2xl"> {/* Slightly taller aspect ratio */}
+        <Link href={`/events/${event.id}`} className="block aspect-[16/10] overflow-hidden rounded-t-2xl" aria-label={`View details for ${event.name}`}>
           <Image
             src={event.imageUrl || `https://picsum.photos/seed/${event.id}/600/375`}
             alt={event.name}
@@ -37,20 +40,20 @@ export function EventCard({ event }: EventCardProps) {
             height={375} 
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             data-ai-hint="event image modern karnataka"
-            loading="lazy"
+            loading="lazy" // Ensure images are lazy-loaded
           />
         </Link>
       </CardHeader>
-      <CardContent className="p-5 flex-grow flex flex-col justify-between"> {/* Increased padding */}
+      <CardContent className="p-5 flex-grow flex flex-col justify-between">
         <div>
           <Link href={`/events/${event.id}`}>
-            <CardTitle className="text-lg md:text-xl font-semibold mb-2 hover:text-primary transition-colors line-clamp-2 leading-tight">
+            <CardTitle id={`event-title-${event.id}`} className="text-lg md:text-xl font-semibold mb-2 hover:text-primary transition-colors line-clamp-2 leading-tight">
               {event.name}
             </CardTitle>
           </Link>
           <div className="space-y-2 text-xs md:text-sm text-muted-foreground mb-3">
             <div className="flex items-center">
-              <CalendarDays className="h-4 w-4 mr-2 text-accent flex-shrink-0" /> {/* Increased icon size and margin */}
+              <CalendarDays className="h-4 w-4 mr-2 text-accent flex-shrink-0" />
               <span>{displayDate} at {event.time}</span>
             </div>
             <div className="flex items-center">
@@ -65,20 +68,20 @@ export function EventCard({ event }: EventCardProps) {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 mt-auto pt-3"> {/* Increased gap and padding-top */}
+        <div className="flex flex-wrap gap-2 mt-auto pt-3">
           <Badge variant="secondary" className="text-xs rounded-md px-2 py-1 bg-secondary/80 text-secondary-foreground font-medium">{event.category}</Badge>
           <Badge variant="outline" className="text-xs rounded-md px-2 py-1 border-primary/60 text-primary font-medium">{event.language}</Badge>
           {event.price !== undefined && event.price !== null && (
              <Badge variant={event.price > 0 ? "outline" : "default"} className={`text-xs rounded-md px-2 py-1 font-medium ${event.price > 0 ? 'border-accent/70 text-accent' : 'bg-accent text-accent-foreground'}`}>
-                <IndianRupee className="h-3.5 w-3.5 mr-1" /> {/* Slightly larger icon */}
+                <IndianRupee className="h-3.5 w-3.5 mr-1" />
                 {event.price > 0 ? `₹${event.price}` : 'Free'}
              </Badge>
           )}
         </div>
       </CardContent>
-      <CardFooter className="p-5 flex justify-between items-center border-t border-border/30"> {/* Increased padding */}
+      <CardFooter className="p-5 flex justify-between items-center border-t border-border/30">
         <div className="flex items-center">
-          <Star className={`h-4.5 w-4.5 mr-1.5 ${event.averageRating && event.averageRating > 0 ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/70'}`} /> {/* Larger star */}
+          <Star className={`h-4.5 w-4.5 mr-1.5 ${event.averageRating && event.averageRating > 0 ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/70'}`} />
           <span className="text-sm font-semibold text-foreground">
             {event.averageRating ? event.averageRating.toFixed(1) : 'New'}
           </span>

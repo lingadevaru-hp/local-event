@@ -1,7 +1,13 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
     darkMode: ["class"],
+    // The 'content' property already acts as 'purge' in Tailwind CSS v3+.
+    // Next.js projects typically configure this correctly.
+    // Explicitly adding 'purge' is not necessary for Tailwind v3+ if 'content' is set.
+    // However, if you were on Tailwind v2 or wanted very specific control, it would be like:
+    // purge: ['./src/**/*.{js,ts,jsx,tsx,mdx}'], 
     content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",

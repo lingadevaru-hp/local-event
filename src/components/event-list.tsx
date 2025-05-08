@@ -2,7 +2,7 @@
 import type { Event } from '@/types/event';
 import { EventCard } from './event-card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { SearchX, WifiOff } from 'lucide-react'; // Added WifiOff for error
+import { SearchX, WifiOff, ServerCrash } from 'lucide-react'; // Added ServerCrash for general errors
 
 interface EventListProps {
   events: Event[];
@@ -11,17 +11,16 @@ interface EventListProps {
 }
 
 const EventCardSkeleton = () => (
-  <div className="bg-card rounded-xl shadow-lg overflow-hidden animate-pulse">
-    <div className="h-48 bg-muted/70"></div>
-    <div className="p-4 space-y-3">
-      <div className="h-6 w-3/4 bg-muted/60 rounded-md"></div>
-      <div className="h-4 w-1/2 bg-muted/50 rounded-md"></div>
-      <div className="h-4 w-full bg-muted/50 rounded-md"></div>
-      <div className="h-4 w-2/3 bg-muted/50 rounded-md"></div>
-      <div className="flex justify-between items-center pt-2">
-        <div className="h-5 w-1/4 bg-muted/50 rounded-md"></div>
-        <div className="h-8 w-1/3 bg-muted/60 rounded-full"></div>
-      </div>
+  <div className="bg-card/50 backdrop-blur-sm border border-border/20 rounded-2xl shadow-lg overflow-hidden animate-pulse p-4 glassmorphism flex flex-col">
+    <div className="aspect-[16/10] bg-muted/40 rounded-xl mb-4"></div> {/* Image placeholder */}
+    <div className="space-y-3 flex-grow">
+      <div className="h-6 w-4/5 bg-muted/30 rounded-md"></div> {/* Title placeholder */}
+      <div className="h-4 w-3/5 bg-muted/20 rounded-md"></div> {/* Date/Time placeholder */}
+      <div className="h-4 w-4/6 bg-muted/20 rounded-md"></div> {/* Location placeholder */}
+    </div>
+    <div className="flex justify-between items-center pt-4 mt-auto">
+      <div className="h-5 w-1/3 bg-muted/20 rounded-md"></div> {/* Rating placeholder */}
+      <div className="h-9 w-1/4 bg-muted/30 rounded-lg"></div> {/* Button placeholder */}
     </div>
   </div>
 );
@@ -39,10 +38,17 @@ export function EventList({ events, isLoading, error }: EventListProps) {
   }
 
   if (error) {
+    let ErrorIcon = ServerCrash;
+    let title = "Oops! Something went wrong.";
+    if (error.toLowerCase().includes("offline") || error.toLowerCase().includes("network")) {
+        ErrorIcon = WifiOff;
+        title = "You are Offline";
+    }
+
     return (
-      <div className="flex flex-col items-center justify-center text-center py-12 min-h-[300px]">
-        <WifiOff className="h-16 w-16 text-destructive mb-4" />
-        <AlertTitle className="text-2xl font-semibold text-destructive mb-2">Oops! Something went wrong.</AlertTitle>
+      <div className="flex flex-col items-center justify-center text-center py-12 min-h-[300px] bg-card/30 glassmorphism rounded-xl shadow-lg">
+        <ErrorIcon className="h-16 w-16 text-destructive mb-4" />
+        <AlertTitle className="text-2xl font-semibold text-destructive mb-2">{title}</AlertTitle>
         <AlertDescription className="text-muted-foreground max-w-md">
           {error || "We couldn't load events at the moment. Please check your internet connection or try again later."}
         </AlertDescription>
@@ -52,7 +58,7 @@ export function EventList({ events, isLoading, error }: EventListProps) {
 
   if (events.length === 0) {
     return (
-       <div className="flex flex-col items-center justify-center text-center py-12 min-h-[300px]">
+       <div className="flex flex-col items-center justify-center text-center py-12 min-h-[300px] bg-card/30 glassmorphism rounded-xl shadow-lg">
         <SearchX className="h-16 w-16 text-primary mb-4" />
         <AlertTitle className="text-2xl font-semibold text-foreground mb-2">No Events Found</AlertTitle>
         <AlertDescription className="text-muted-foreground max-w-md">

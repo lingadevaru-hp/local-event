@@ -1,8 +1,8 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getMessaging, type Messaging } from 'firebase/messaging'; // Import Firebase Messaging
+import { getFirestore, type Firestore, enablePersistence } from 'firebase/firestore'; // Added enablePersistence
+import { getMessaging, type Messaging } from 'firebase/messaging';
 
 // Read environment variables
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -38,8 +38,6 @@ if (missingCriticalVars.length > 0) {
   console.error("FIREBASE CONFIGURATION ERROR:");
   console.error(errorMsg);
   console.error("*****************************************************************");
-  // Potentially throw an error or handle this state appropriately if Firebase is critical
-  // For now, services will remain null.
 } else {
   try {
     if (!getApps().length) {
@@ -51,8 +49,23 @@ if (missingCriticalVars.length > 0) {
     if (app) {
       auth = getAuth(app);
       firestore = getFirestore(app);
+      
+      // Enable Firestore persistence on the client side
+      if (firestore && typeof window !== 'undefined') {
+        enablePersistence(firestore)
+          .catch((err) => {
+            if (err.code === 'failed-precondition') {
+              console.warn('Firebase persistence failed: Firestore persistence can only be enabled in one tab at a time.');
+            } else if (err.code === 'unimplemented') {
+              console.warn('Firebase persistence failed: The current browser does not support all of the features required to enable persistence.');
+            } else {
+              console.error('Firebase persistence error:', err);
+            }
+          });
+      }
+      
       googleAuthProvider = new GoogleAuthProvider();
-      if (typeof window !== 'undefined') { // Messaging is client-side only
+      if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID) {
         try {
             messaging = getMessaging(app);
         } catch (e) {
@@ -74,14 +87,11 @@ if (missingCriticalVars.length > 0) {
   }
 }
 
-// Client-side warnings for non-critical but potentially useful variables
 if (app && typeof window !== 'undefined') {
   if (!storageBucket) {
     console.warn("Firebase Storage Bucket (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) is missing. File uploads might not work.");
   }
-  if (!messagingSenderId) {
-    console.warn("Firebase Messaging Sender ID (NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID) is missing. Push notifications setup may be incomplete.");
-  }
+  // messagingSenderId check is now part of messaging init
   if (!appId) {
     console.warn("Firebase App ID (NEXT_PUBLIC_FIREBASE_APP_ID) is missing. Analytics or other services might be affected.");
   }
