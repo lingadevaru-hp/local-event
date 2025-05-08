@@ -57,7 +57,10 @@ export function EventFilters({
 
   return (
     <div className="mb-8 p-4 bg-card border rounded-lg shadow-sm">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+      <div 
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end"
+        suppressHydrationWarning // Added to mitigate hydration errors from browser extensions
+      >
         <div className="lg:col-span-1">
           <ShadcnLabel htmlFor="search">Search Events</ShadcnLabel>
           <div className="relative mt-1">
@@ -149,3 +152,4 @@ export function EventFilters({
     </div>
   );
 }
+
