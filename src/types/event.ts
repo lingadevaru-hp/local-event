@@ -1,4 +1,3 @@
-
 export type KarnatakaDistrict = 
   | "Bagalkot" | "Ballari (Bellary)" | "Belagavi (Belgaum)" | "Bengaluru Rural" | "Bengaluru Urban"
   | "Bidar" | "Chamarajanagar" | "Chikkaballapur" | "Chikkamagaluru" | "Chitradurga"
@@ -116,17 +115,19 @@ export interface Event {
 
   organizerId?: string;
   organizerName?: string;
+  guestSpeaker?: string; // New field
+  capacity?: number; // New field
 
   price?: number;
   registrationUrl?: string;
 
-  createdAt: string;
+  createdAt: string; // Should be ISO string or Firestore Timestamp
   averageRating?: number; 
   ratings?: Rating[]; 
   distance?: number;
   
   targetDistricts?: KarnatakaDistrict[]; 
-  attendees?: string[]; // Array of user IDs who signed up
+  attendees?: string[]; 
 }
 
 export type DateRangeFilter = "Today" | "This Weekend" | "Next 7 Days" | "All";

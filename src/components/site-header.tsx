@@ -1,107 +1,92 @@
-
 'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Bell, ListChecks, LogOut, UserCircle, LayoutDashboard } from 'lucide-react'; 
+import { Bell, ListChecks, LayoutDashboard, LogIn, UserPlus } from 'lucide-react'; 
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useRouter } from 'next/navigation';
-import { useClerk, UserButton, SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs';
-import { useAuth } from '@/contexts/authContext'; // Keep for appUser if needed beyond Clerk's user
+import { UserButton, SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs';
+import Image from 'next/image'; // Using next/image
 
 export function SiteHeader() {
-  const { signOut: clerkSignOut, user: clerkUser } = useClerk();
-  const { appUser } = useAuth(); // appUser from custom context
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    try {
-      await clerkSignOut(() => router.push('/'));
-    } catch (error) {
-      console.error("Failed to sign out:", error);
-    }
-  };
-  
-  const logoSrc = "/logo-placeholder.png"; // Path to your actual logo
-
   const handleVibrate = () => {
     if (typeof window !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(20); // Short vibration
+      navigator.vibrate(20); 
     }
   };
 
+  // Placeholder for logo, ideally an SVG or optimized PNG
+  const logoSrc = "/logo-placeholder.png"; // Replace with actual logo path if available
+                                        // data-ai-hint="pulse logo modern orange blue" 
+                                        // The hint is useful if you want AI to generate/find a logo later.
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 glassmorphism">
       <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center space-x-2" aria-label="Local Pulse Karnataka Home" onClick={handleVibrate}>
-          <img 
-            src={logoSrc} 
-            alt="Local Pulse Logo" 
-            className="h-9 w-9 object-contain transition-transform hover:scale-105"
-            data-ai-hint="pulse logo orange blue"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent) {
-                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("viewBox", "0 0 24 24");
-                svg.setAttribute("fill", "currentColor");
-                svg.setAttribute("class", "h-8 w-8 text-primary");
-                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                path.setAttribute("d", "M12 2.25c-5.107 0-9.25 4.037-9.25 9 0 4.962 4.143 9 9.25 9s9.25-4.038 9.25-9c0-4.963-4.143-9-9.25-9zm0 16.5c-4.006 0-7.25-3.244-7.25-7.25S7.994 4.75 12 4.75s7.25 3.244 7.25 7.25S16.006 18.75 12 18.75zm0-5.5c-.966 0-1.75-.784-1.75-1.75s.784-1.75 1.75-1.75 1.75.784 1.75 1.75-.784 1.75-1.75 1.75z");
-                svg.appendChild(path);
-                if (target.nextSibling) {
-                    parent.insertBefore(svg, target.nextSibling);
-                } else {
-                    parent.appendChild(svg);
-                }
-              }
-            }}
-          />
-          <span className="text-xl font-semibold tracking-tight text-foreground">Local Pulse</span>
+        <Link href="/" className="flex items-center space-x-2 group" aria-label="Local Pulse Karnataka Home" onClick={handleVibrate}>
+          {/* Using a div as a fallback for the logo image */}
+          <div className="h-9 w-9 relative group-hover:scale-105 transition-transform" data-ai-hint="pulse logo modern orange blue">
+            <Image 
+              src={logoSrc} 
+              alt="Local Pulse Logo" 
+              fill
+              sizes="36px"
+              className="object-contain"
+              onError={(e) => {
+                // Fallback to a simple SVG or text if image fails
+                e.currentTarget.style.display = 'none';
+                const fallback = e.currentTarget.parentElement?.querySelector('.logo-fallback');
+                if (fallback) (fallback as HTMLElement).style.display = 'flex';
+              }}
+            />
+             <div 
+              className="logo-fallback hidden items-center justify-center h-full w-full bg-primary rounded-full text-primary-foreground font-bold text-lg"
+            >
+              LP
+            </div>
+          </div>
+          <span className="text-xl font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors">Local Pulse</span>
         </Link>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2">
           <ThemeToggleButton />
           
           <SignedIn>
-            <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex" onClick={handleVibrate}>
+            <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex rounded-full" onClick={handleVibrate}>
               <Link href="/watchlist" aria-label="Watchlist">
                 <ListChecks className="h-5 w-5" />
               </Link>
             </Button>
-            <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex" onClick={handleVibrate}>
+            <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex rounded-full" onClick={handleVibrate}>
               <Link href="/notifications" aria-label="Notifications">
                   <Bell className="h-5 w-5" />
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex" onClick={handleVibrate}>
+            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex rounded-lg" onClick={handleVibrate}>
                 <Link href="/dashboard"><LayoutDashboard className="mr-2 h-4 w-4 sm:mr-0 md:mr-2"/> <span className="hidden md:inline">Dashboard</span></Link>
             </Button>
             <UserButton afterSignOutUrl="/" appearance={{
               elements: {
-                avatarBox: "h-9 w-9",
-                userButtonPopoverCard: "shadow-xl border-border rounded-lg",
+                avatarBox: "h-9 w-9 shadow-md hover:shadow-lg transition-shadow",
+                userButtonPopoverCard: "shadow-xl rounded-xl border-border/50 bg-popover/80 glassmorphism",
+                userButtonPopoverActionButton: "hover:bg-muted/50 rounded-md",
+                userButtonPopoverActionButtonIcon: "text-primary",
               }
             }}/>
           </SignedIn>
 
           <SignedOut>
             <SignInButton mode="modal">
-              <Button variant="ghost" onClick={handleVibrate}>Login</Button>
+              <Button variant="ghost" onClick={handleVibrate} className="rounded-lg text-sm px-3 py-1.5 sm:px-4 sm:py-2 hover:bg-primary/10">
+                <LogIn className="mr-1.5 h-4 w-4 sm:mr-2" /> Login
+              </Button>
             </SignInButton>
             <SignUpButton mode="modal">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleVibrate}>Register</Button>
+              <Button 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm px-3 py-1.5 sm:px-4 sm:py-2 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95" 
+                onClick={handleVibrate}
+              >
+                <UserPlus className="mr-1.5 h-4 w-4 sm:mr-2" /> Register
+              </Button>
             </SignUpButton>
           </SignedOut>
         </div>

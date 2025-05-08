@@ -1,23 +1,22 @@
-
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { ThemeProvider } from '@/components/providers'; // Updated import path
-import { AuthProvider } from '@/contexts/authContext'; // Using custom AuthContext, but ClerkProvider will handle primary auth
+import { ThemeProvider } from '@/components/providers';
 import { BottomNavigationBar } from '@/components/bottom-navigation-bar';
 import { ClerkProvider } from '@clerk/nextjs';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export const metadata: Metadata = {
-  title: 'Local Pulse Karnataka - Discover Events in Your District',
-  description: 'Find and review local events, Utsavas, college fests, and more across Karnataka. Filter by district, city, and language.',
+  title: 'Local Pulse Karnataka - Discover Events',
+  description: 'Find and review local events, Utsavas, college fests, and more across Karnataka. ನಿಮ್ಮ ಜಿಲ್ಲೆಯಲ್ಲಿ ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಹುಡುಕಿ ಮತ್ತು ವಿಮರ್ಶಿಸಿ.',
   manifest: "/manifest.json",
   applicationName: "Local Pulse KA",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent", // Changed for Apple feel
     title: "Local Pulse KA",
   },
   formatDetection: {
@@ -28,15 +27,19 @@ export const metadata: Metadata = {
     siteName: "Local Pulse Karnataka",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
+    images: [{ url: '/icons/icon-512x512.png' }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
+    images: ['/icons/icon-512x512.png'],
   },
   icons: [
-    { rel: "apple-touch-icon", url: "/icons/icon-192x192.png" },
-    { rel: "icon", url: "/icons/icon-192x192.png" },
+    { rel: "apple-touch-icon", sizes: "180x180", url: "/icons/apple-touch-icon.png" },
+    { rel: "icon", type: "image/png", sizes: "32x32", url: "/icons/favicon-32x32.png" },
+    { rel: "icon", type: "image/png", sizes: "16x16", url: "/icons/favicon-16x16.png" },
+    { rel: "mask-icon", url: "/icons/safari-pinned-tab.svg", color: "#007AFF" },
   ],
 };
 
@@ -49,6 +52,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // viewportFit: "cover", // For edge-to-edge on iOS
 };
 
 export default function RootLayout({
@@ -61,45 +65,37 @@ export default function RootLayout({
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       appearance={{
         variables: {
-          colorPrimary: 'hsl(var(--primary))',
+          colorPrimary: 'hsl(var(--primary))', // Apple Blue
           colorText: 'hsl(var(--foreground))',
           colorBackground: 'hsl(var(--background))',
           colorInputBackground: 'hsl(var(--input))',
           colorInputText: 'hsl(var(--foreground))',
+          borderRadius: '0.75rem', // More rounded like Apple UI
         },
         elements: {
-          card: 'shadow-xl rounded-lg border-border bg-card',
-          formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+          card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md', // Glassmorphism hint
+          formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg py-2.5 text-base transition-transform hover:scale-105 active:scale-95 shadow-md',
+          socialButtonsBlockButton: 'rounded-lg border-border/50',
           footerActionLink: 'text-primary hover:text-primary/90',
+          formFieldInput: 'rounded-lg focus:border-primary focus:ring-primary/50',
+          headerTitle: 'text-2xl font-semibold text-foreground',
+          headerSubtitle: 'text-muted-foreground',
         }
       }}
     >
       <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
         <head>
-          <meta name="application-name" content="Local Pulse KA" />
+          {/* PWA meta tags from manifest are usually sufficient, but some can be reiterated */}
           <meta name="apple-mobile-web-app-capable" content="yes" />
-          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="Local Pulse KA" />
           <meta name="format-detection" content="telephone=no" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="msapplication-config" content="/icons/browserconfig.xml" />
           <meta name="msapplication-TileColor" content="#007AFF" /> {/* Apple Blue */}
           <meta name="msapplication-tap-highlight" content="no" />
-          
-          <link rel="manifest" href="/manifest.json" />
-          
-          <meta name="theme-color" content="hsl(var(--background))" />
-
-          <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-          <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-          <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-          <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" />
-
-          <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
-          <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
         </head>
-        <body className="antialiased flex flex-col min-h-screen bg-background text-foreground">
-          <AuthProvider> 
+        <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               <div className="relative flex min-h-screen flex-col">
                 <SiteHeader />
@@ -110,8 +106,8 @@ export default function RootLayout({
                 <BottomNavigationBar />
               </div>
               <Toaster />
+              <SpeedInsights />
             </ThemeProvider>
-          </AuthProvider>
         </body>
       </html>
     </ClerkProvider>

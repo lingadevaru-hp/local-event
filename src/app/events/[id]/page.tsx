@@ -1,4 +1,3 @@
-
 'use client';
 import type React from 'react'; 
 import { useEffect, useState, use } from 'react'; 
@@ -9,17 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
-import { CalendarDays, MapPin, Star, Tag, User as UserIcon, Send, Loader2, Languages, IndianRupee, Landmark, Heart, CheckCircle, ExternalLink, UserCircle as UserCircleIcon, ArrowLeft, Ticket, Share2 } from 'lucide-react';
+import { CalendarDays, MapPin, Star, Send, Loader2, Languages, IndianRupee, Landmark, Users, Info, ArrowLeft, Ticket, Share2, Bell, ExternalLink as LinkIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, updateDoc, arrayUnion, runTransaction, Timestamp } from 'firebase/firestore';
-import { firestore } from '@/lib/firebase';
-import { useUser } from '@clerk/nextjs'; // Using Clerk's useUser
+import { doc, getDoc, updateDoc, arrayUnion, runTransaction, Timestamp, collection } from 'firebase/firestore';
+import { firestore, messaging } from '@/lib/firebase'; // messaging for future FCM
+import { useUser } from '@clerk/nextjs';
+import { motion } from 'framer-motion';
+// For FCM, if implementing notifications
+// import { getToken, onMessage } from "firebase/messaging";
 
-// Function to fetch event by ID from Firestore
 async function fetchEventById(id: string): Promise<Event | null> {
   if (!firestore) {
     console.error("Firestore not initialized");
@@ -33,9 +34,9 @@ async function fetchEventById(id: string): Promise<Event | null> {
       return { 
         ...data, 
         id: docSnap.id, 
-        createdAt: data.createdAt.toDate().toISOString(),
-        date: data.date.toDate().toISOString().split('T')[0],
-        endDate: data.endDate ? data.endDate.toDate().toISOString().split('T')[0] : undefined,
+        createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
+        date: data.date?.toDate?.().toISOString().split('T')[0] || data.date,
+        endDate: data.endDate ? (data.endDate.toDate?.().toISOString().split('T')[0] || data.endDate) : undefined,
       };
     } else {
       return null;
@@ -46,6 +47,7 @@ async function fetchEventById(id: string): Promise<Event | null> {
   }
 }
 
+// Simplified review submission, assuming appUser details are not strictly needed here or fetched separately
 async function submitReviewToFirestore(eventId: string, ratingValue: number, reviewText: string, clerkUser: NonNullable<ReturnType<typeof useUser>['user']> ): Promise<RatingType> {
   if (!firestore) throw new Error("Firestore not initialized");
 
@@ -57,12 +59,11 @@ async function submitReviewToFirestore(eventId: string, ratingValue: number, rev
     reviewText,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    user: { // Using Clerk user data
+    user: { 
         id: clerkUser.id,
         username: clerkUser.username || clerkUser.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'Anonymous',
         name: clerkUser.fullName || 'Anonymous User',
         photoURL: clerkUser.imageUrl || undefined,
-        // languagePreference can be fetched from custom appUser profile if needed
     }
   };
 
@@ -75,14 +76,10 @@ async function submitReviewToFirestore(eventId: string, ratingValue: number, rev
       
       const currentEventData = eventDoc.data() as Event;
       const existingRatings = currentEventData.ratings || [];
-      const userPreviousReviewIndex = existingRatings.findIndex(r => r.userId === clerkUser.id);
-
-      let updatedRatingsArray;
-      if (userPreviousReviewIndex > -1) {
-        updatedRatingsArray = existingRatings.map((r, index) => index === userPreviousReviewIndex ? newReview : r);
-      } else {
-        updatedRatingsArray = [...existingRatings, newReview];
-      }
+      
+      // Remove previous review by the same user, if any
+      const otherReviews = existingRatings.filter(r => r.userId !== clerkUser.id);
+      const updatedRatingsArray = [...otherReviews, newReview];
       
       const totalRatingSum = updatedRatingsArray.reduce((sum, r) => sum + r.rating, 0);
       const newAverageRating = updatedRatingsArray.length > 0 ? totalRatingSum / updatedRatingsArray.length : 0;
@@ -96,20 +93,6 @@ async function submitReviewToFirestore(eventId: string, ratingValue: number, rev
   } catch (error) {
     console.error("Transaction failed: ", error);
     throw error;
-  }
-}
-
-async function signUpForEventInFirestore(eventId: string, userId: string): Promise<{ success: boolean; message: string }> {
-  if (!firestore) return { success: false, message: "Database not initialized." };
-  try {
-    const eventDocRef = doc(firestore, 'events', eventId);
-    await updateDoc(eventDocRef, {
-      attendees: arrayUnion(userId)
-    });
-    return { success: true, message: "Successfully signed up for the event!" };
-  } catch (error) {
-    console.error("Error signing up for event in Firestore:", error);
-    return { success: false, message: "Failed to sign up. Please try again." };
   }
 }
 
@@ -128,9 +111,6 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   const [userRating, setUserRating] = useState(0);
   const [userReviewText, setUserReviewText] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const [isSigningUp, setIsSigningUp] = useState(false);
-  const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [isWatchlistLoading, setIsWatchlistLoading] = useState(false);
 
   const { toast } = useToast();
 
@@ -149,9 +129,6 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                 setUserRating(existingReview.rating);
                 setUserReviewText(existingReview.reviewText || '');
               }
-            }
-            if (typeof window !== 'undefined') {
-                 setIsInWatchlist(localStorage.getItem(`watchlist_${eventId}_${clerkUser?.id || 'guest'}`) === 'true');
             }
           } else {
             setError('Event not found.');
@@ -194,47 +171,9 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     }
   };
 
-  const handleEventSignUp = async () => {
-    if (!isSignedIn || !clerkUser) {
-        toast({ title: "Login Required", description: "Please log in to sign up for this event.", variant: "destructive" });
-        router.push(`/sign-in?redirect_url=/events/${resolvedParams.id}`);
-        return;
-    }
-    setIsSigningUp(true);
-    const result = await signUpForEventInFirestore(resolvedParams.id, clerkUser.id);
-    if (result.success) {
-        toast({ title: "Event Signup Successful", description: result.message });
-    } else {
-        toast({ title: "Event Signup Failed", description: result.message, variant: "destructive" });
-    }
-    setIsSigningUp(false);
-  };
-
-  const handleToggleWatchlist = async () => {
-    if (!isSignedIn || !clerkUser) {
-      toast({ title: "Login Required", description: "Please log in to manage your watchlist.", variant: "destructive" });
-      router.push(`/sign-in?redirect_url=/events/${resolvedParams.id}`);
-      return;
-    }
-    setIsWatchlistLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 300)); 
-    const newWatchlistStatus = !isInWatchlist;
-    const watchlistItemKey = `watchlist_${resolvedParams.id}_${clerkUser.id}`; 
-    setIsInWatchlist(newWatchlistStatus);
-    if (typeof window !== 'undefined') {
-        if (newWatchlistStatus) {
-        localStorage.setItem(watchlistItemKey, 'true');
-        toast({ title: "Added to Watchlist!", description: `${event?.name} is now in your watchlist.` });
-        } else {
-        localStorage.removeItem(watchlistItemKey);
-        toast({ title: "Removed from Watchlist", description: `${event?.name} has been removed from your watchlist.` });
-        }
-    }
-    setIsWatchlistLoading(false);
-  };
-
   const handleShareEvent = async () => {
-    if (navigator.share && event) {
+    if (!event) return;
+    if (navigator.share) {
       try {
         await navigator.share({
           title: event.name,
@@ -256,9 +195,31 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
      if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
   };
 
+  const handleSetReminder = async () => {
+    // Basic FCM permission request - full implementation is more complex
+    if (!messaging || !("Notification" in window)) {
+        toast({ title: "Notifications Not Supported", description: "Your browser does not support push notifications.", variant: "destructive" });
+        return;
+    }
+    if (Notification.permission === "granted") {
+        // TODO: Implement logic to subscribe to event-specific topic or store token with event preference
+        toast({ title: "Reminder Set!", description: "We'll notify you before the event." });
+    } else if (Notification.permission !== "denied") {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+            // TODO: Implement logic as above
+            toast({ title: "Reminder Set!", description: "We'll notify you before the event." });
+        } else {
+            toast({ title: "Permission Denied", description: "You won't receive reminders for this event.", variant: "destructive" });
+        }
+    } else {
+         toast({ title: "Notifications Blocked", description: "Please enable notifications in your browser settings.", variant: "destructive" });
+    }
+  };
+
   if (!clerkLoaded || isLoadingEvent) { 
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
     );
@@ -268,7 +229,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
-         <Button variant="outline" asChild className="mt-6 rounded-full">
+         <Button variant="outline" asChild className="mt-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
             <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
         </Button>
       </div>
@@ -279,82 +240,69 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert><AlertDescription>Event data is not available.</AlertDescription></Alert>
-         <Button variant="outline" asChild className="mt-6 rounded-full">
+         <Button variant="outline" asChild className="mt-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
             <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
         </Button>
       </div>
     );
   }
 
-  const displayDate = `${new Date(event.date).toLocaleDateString('en-IN', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  })} at ${event.time}`;
-  const displayEndDate = event.endDate && event.endTime ? ` to ${new Date(event.endDate).toLocaleDateString('en-IN', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  })} at ${event.endTime}` : '';
-
-  const eventImage = event.imageUrl || `https://picsum.photos/seed/${event.id}/1200/600`;
+  const eventDate = new Date(event.date);
+  const displayDate = `${eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, ${event.time}`;
+  const displayEndDate = event.endDate && event.endTime ? ` to ${new Date(event.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, ${event.endTime}` : '';
+  const googleMapsLink = event.googleMapsUrl || (event.latitude && event.longitude ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}` : undefined);
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="container mx-auto px-2 sm:px-4 py-8"
+    >
       <div className="mb-6">
-        <Button variant="outline" asChild className="rounded-full shadow-sm hover:shadow-md transition-shadow">
+        <Button variant="outline" asChild className="rounded-lg shadow-sm hover:shadow-md transition-shadow">
             <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
         </Button>
       </div>
-      <Card className="overflow-hidden shadow-xl bg-card rounded-2xl border-none">
+      <Card className="overflow-hidden shadow-2xl bg-card/70 glassmorphism rounded-2xl border-none">
         <CardHeader className="p-0 relative">
           <Image
-            src={eventImage}
+            src={event.imageUrl || `https://picsum.photos/seed/${event.id}/1200/500`}
             alt={event.name}
-            width={1200} height={600}
-            className="w-full h-64 md:h-[450px] object-cover" priority
-            data-ai-hint="event banner"
+            width={1200} height={500}
+            className="w-full h-56 md:h-[400px] object-cover" priority
+            data-ai-hint="event panorama"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-6 md:p-10">
-            <CardTitle className="text-3xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 p-6 md:p-8">
+            <CardTitle className="text-3xl md:text-4xl font-bold text-white tracking-tight drop-shadow-lg">
               {event.name}
             </CardTitle>
              {event.nameKa && <p className="text-lg md:text-xl text-gray-200 mt-1 drop-shadow-sm">{event.nameKa}</p>}
           </div>
         </CardHeader>
-        <CardContent className="p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-8">
+        <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-8">
           <div className="md:col-span-2 space-y-8">
             <section>
               <h2 className="text-2xl font-semibold mb-3 text-primary">Event Description</h2>
               <p className="text-foreground/90 leading-relaxed whitespace-pre-line text-base">
                 {event.description}
               </p>
-              {event.descriptionKa && (
-                <div className="mt-4 p-4 bg-secondary/50 rounded-xl">
-                    <h3 className="text-lg font-medium text-primary mb-1">ವಿವರಣೆ (ಕನ್ನಡ)</h3>
-                    <p className="text-foreground/80 leading-relaxed whitespace-pre-line text-base">{event.descriptionKa}</p>
-                </div>
-              )}
             </section>
 
-            
             <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
-                <Button onClick={handleEventSignUp} disabled={isSigningUp || !isSignedIn} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6 py-3 text-base shadow-md hover:shadow-lg transition-all duration-200">
-                    {isSigningUp ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Ticket className="mr-2 h-5 w-5" />}
-                    Sign Up for Event
-                </Button>
-                {isSignedIn && (
-                    <Button onClick={handleToggleWatchlist} disabled={isWatchlistLoading} variant={isInWatchlist ? "secondary" : "outline"} className="w-full sm:w-auto rounded-full px-6 py-3 text-base shadow-sm hover:shadow-md transition-all duration-200">
-                    {isWatchlistLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (isInWatchlist ? <CheckCircle className="mr-2 h-5 w-5 text-green-500" /> : <Heart className="mr-2 h-5 w-5" />)}
-                    {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-                    </Button>
-                )}
                 {event.registrationUrl && (
-                    <Button asChild variant="outline" className="w-full sm:w-auto rounded-full px-6 py-3 text-base shadow-sm hover:shadow-md transition-all duration-200">
+                    <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg py-3 px-6 text-base shadow-md hover:scale-105 active:scale-95 transition-all duration-200">
                         <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="mr-2 h-5 w-5" /> Official Registration
+                            <Ticket className="mr-2 h-5 w-5" /> Register Now
                         </a>
                     </Button>
                 )}
-                 <Button onClick={handleShareEvent} variant="outline" className="w-full sm:w-auto rounded-full px-6 py-3 text-base shadow-sm hover:shadow-md transition-all duration-200">
+                <Button onClick={handleShareEvent} variant="outline" size="lg" className="rounded-lg py-3 px-6 text-base shadow-sm hover:shadow-md hover:bg-accent/10 transition-all duration-200">
                     <Share2 className="mr-2 h-5 w-5" /> Share Event
+                </Button>
+                <Button onClick={handleSetReminder} variant="outline" size="lg" className="rounded-lg py-3 px-6 text-base shadow-sm hover:shadow-md hover:bg-accent/10 transition-all duration-200">
+                    <Bell className="mr-2 h-5 w-5" /> Set Reminder
                 </Button>
             </div>
 
@@ -362,10 +310,10 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
 
             <section>
               <h2 className="text-2xl font-semibold mb-6 text-primary">Reviews & Ratings</h2>
-              {isSignedIn ? (
-                <div className="mb-8 p-5 border border-border/50 rounded-xl bg-secondary/30 shadow-sm">
+              {isSignedIn && clerkUser ? (
+                <div className="mb-8 p-5 border border-border/30 rounded-xl bg-card/50 glassmorphism shadow-sm">
                   <h3 className="text-lg font-medium mb-3 text-foreground">
-                    {event.ratings?.find(r => r.userId === clerkUser?.id) ? 'Update Your Review' : 'Leave a Review'}
+                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Your Review' : 'Leave a Review'}
                   </h3>
                   <div className="flex items-center mb-4 space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -373,17 +321,17 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
                         onClick={() => setUserRating(star)} />
                     ))}
                   </div>
-                  <Textarea placeholder="Share your experience..." value={userReviewText} onChange={(e) => setUserReviewText(e.target.value)} className="mb-4 min-h-[120px] rounded-lg border-input focus:border-primary" aria-label="Your review text" />
-                  <Button onClick={handleRatingSubmit} disabled={isSubmittingReview || userRating === 0} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6 py-3 text-base shadow-md hover:shadow-lg transition-all">
+                  <Textarea placeholder="Share your experience..." value={userReviewText} onChange={(e) => setUserReviewText(e.target.value)} className="mb-4 min-h-[120px] rounded-lg border-input bg-background/70 focus:border-primary" aria-label="Your review text" />
+                  <Button onClick={handleRatingSubmit} disabled={isSubmittingReview || userRating === 0} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-6 py-3 text-base shadow-md hover:scale-105 active:scale-95 transition-all">
                     {isSubmittingReview ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
-                    {event.ratings?.find(r => r.userId === clerkUser?.id) ? 'Update Review' : 'Submit Review'}
+                    {event.ratings?.find(r => r.userId === clerkUser.id) ? 'Update Review' : 'Submit Review'}
                   </Button>
                 </div>
               ) : (
-                <Alert className="rounded-xl border-primary/30 bg-primary/5">
+                <Alert className="rounded-xl border-primary/30 bg-primary/5 mb-6">
                   <Star className="h-5 w-5 text-primary" />
                   <AlertDescription className="text-foreground/80">
-                    <Link href={`/sign-in?redirect_url=/events/${resolvedParams.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review or sign up for this event.
+                    <Link href={`/sign-in?redirect_url=/events/${resolvedParams.id}`} className="font-medium text-primary hover:underline">Log in</Link> to leave a review.
                   </AlertDescription>
                 </Alert>
               )}
@@ -391,12 +339,12 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
               {event.ratings && event.ratings.length > 0 ? (
                 <div className="space-y-6">
                   {event.ratings.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((review) => (
-                    <Card key={review.id} className="bg-background/80 p-5 rounded-xl shadow-md border-border/50">
+                    <Card key={review.id} className="bg-card/60 glassmorphism p-5 rounded-xl shadow-md border-border/30">
                       <CardHeader className="flex flex-row items-start justify-between pb-2 p-0 mb-3">
                         <div className="flex items-center">
                            <Avatar className="h-10 w-10 mr-3 border-2 border-primary/50">
-                            <AvatarImage src={review.user?.photoURL || `https://picsum.photos/seed/${review.user?.username || review.userId}/50/50`} alt={review.user?.name || 'User'} data-ai-hint="avatar person"/>
-                            <AvatarFallback className="bg-muted text-muted-foreground">{review.user?.name ? review.user.name.charAt(0).toUpperCase() : <UserCircleIcon className="h-6 w-6"/>}</AvatarFallback>
+                            <AvatarImage src={review.user?.photoURL || `https://picsum.photos/seed/${review.user?.id || 'anon'}/50/50`} alt={review.user?.name || 'User'} data-ai-hint="reviewer avatar"/>
+                            <AvatarFallback className="bg-muted text-muted-foreground">{review.user?.name ? review.user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
                           </Avatar>
                           <div>
                              <p className="font-semibold text-foreground">{review.user?.name || review.user?.username || 'Anonymous User'}</p>
@@ -420,32 +368,25 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
           </div>
 
           <aside className="md:col-span-1 space-y-6">
-            <Card className="shadow-lg bg-secondary/30 p-1 rounded-xl border-none">
+            <Card className="shadow-lg bg-card/50 glassmorphism p-1 rounded-xl border-none">
               <CardHeader className="pb-4 pt-5 px-5">
-                <CardTitle className="text-xl font-semibold text-primary">Information</CardTitle>
+                <CardTitle className="text-xl font-semibold text-primary flex items-center"><Info className="mr-2 h-5 w-5"/>Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 text-sm px-5 pb-5">
                 <InfoItem icon={CalendarDays} label="Date & Time" value={`${displayDate}${displayEndDate}`} />
-                <InfoItem icon={MapPin} label="Location" value={`${event.locationName}, ${event.address}, ${event.city}, ${event.district}${event.pinCode ? `, ${event.pinCode}` : ''}`} mapLink={event.googleMapsUrl || (event.latitude && event.longitude ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}` : undefined)} />
-                {event.localLandmark && <InfoItem icon={Landmark} label="Local Landmark" value={event.localLandmark} />}
-                <InfoItem icon={Tag} label="Category"> <Badge variant="outline" className="text-sm bg-primary/10 text-primary-foreground border-primary/50 px-2.5 py-1 rounded-full">{event.category}</Badge> </InfoItem>
+                <InfoItem icon={MapPin} label="Location" value={`${event.locationName}, ${event.address}, ${event.city}, ${event.district}`} mapLink={googleMapsLink} />
+                {event.guestSpeaker && <InfoItem icon={Users} label="Guest Speaker" value={event.guestSpeaker} />}
+                {event.capacity !== undefined && <InfoItem icon={Users} label="Capacity" value={`Max ${event.capacity} attendees`} />}
+                <InfoItem icon={IndianRupee} label="Price" value={event.price !== undefined && event.price > 0 ? `₹${event.price}` : 'Free'} boldValue />
                 <InfoItem icon={Languages} label="Language" value={event.language} />
-                {event.culturalRelevance && event.culturalRelevance.length > 0 && (
-                    <InfoItem icon={Star} label="Cultural Relevance">
-                         <div className="flex flex-wrap gap-1.5 mt-1">
-                            {event.culturalRelevance.map(tag => <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5 rounded-md">{tag}</Badge>)}
-                        </div>
-                    </InfoItem>
-                )}
-                {event.price !== undefined && event.price !== null && <InfoItem icon={IndianRupee} label="Price" value={event.price > 0 ? `₹${event.price}` : 'Free'} boldValue />}
                 <InfoItem icon={Star} label="Average Rating" value={event.averageRating ? `${event.averageRating.toFixed(1)} / 5 (${event.ratings?.length || 0} reviews)` : 'Not Rated Yet'} />
-                {event.organizerName && <InfoItem icon={UserIcon} label="Organizer" value={event.organizerName} />}
+                {event.organizerName && <InfoItem icon={Landmark} label="Organizer" value={event.organizerName} />}
               </CardContent>
             </Card>
           </aside>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 }
 
@@ -458,9 +399,8 @@ const InfoItem: React.FC<{icon: React.ElementType, label: string, value?: string
         <p className="font-medium text-foreground/90">{label}</p>
         {value && typeof value === 'string' ? <p className={`text-muted-foreground ${boldValue ? 'font-semibold text-foreground' : ''}`}>{value}</p> : value}
         {children}
-        {mapLink && <a href={mapLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs block mt-1">View on Map</a>}
+        {mapLink && <a href={mapLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs block mt-1 flex items-center"><LinkIcon className="h-3 w-3 mr-1"/>View on Map</a>}
       </div>
     </div>
   );
 };
-

@@ -1,12 +1,11 @@
-
 {
   "name": "Local Pulse Karnataka",
   "short_name": "LocalPulseKA",
   "description": "Discover and rate local events happening across Karnataka. ನಿಮ್ಮ ಜಿಲ್ಲೆಯಲ್ಲಿ ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಹುಡುಕಿ ಮತ್ತು ವಿಮರ್ಶಿಸಿ.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3498db", 
+  "background_color": "#F0F2F5", 
+  "theme_color": "#007AFF", 
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en-US",
@@ -59,5 +58,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "splash_pages": null
 }
