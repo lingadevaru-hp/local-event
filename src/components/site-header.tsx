@@ -3,23 +3,12 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Bell, ListChecks, UserCircle, Settings, Briefcase } from 'lucide-react'; 
+import { Bell, ListChecks } from 'lucide-react'; 
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from '@clerk/nextjs';
-import { useUser } from '@clerk/nextjs'; // For getting user info if needed directly
+// useUser hook can be used if user information is needed directly in this component, but for now, UserButton handles profile links.
 
 export function SiteHeader() {
-  const { user } = useUser();
-
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center space-x-2 sm:space-x-4 px-4 sm:px-6 lg:px-8">
@@ -44,17 +33,9 @@ export function SiteHeader() {
                 </Link>
               </Button>
               <UserButton afterSignOutUrl="/">
-                {/* UserButton has built-in links to profile, manage account etc. Add custom ones if needed */}
-                <UserButton.UserProfileLink label="My Profile" url="/profile" />
-                <UserButton.UserProfilePage label="Manage Account" url="/user" />
-                {/* Example of custom item if UserButton allows children like this, check Clerk docs */}
-                {/* <DropdownMenuItem asChild> is not how UserButton works for custom items, 
-                    It's typically through `userProfileProps` or specific named slots if available.
-                    For this example, we rely on standard UserButton links. 
-                    Custom navigation items for dashboard can be separate buttons or links as below.
-                */}
+                <UserButton.UserProfileLink label="My App Profile" url="/profile" />
+                {/* Clerk's default "Manage Account" links to /user */}
               </UserButton>
-              {/* Separate link for dashboard for clarity for now */}
                <Button variant="ghost" size="sm" asChild className="ml-2">
                   <Link href="/dashboard">Dashboard</Link>
               </Button>

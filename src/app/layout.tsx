@@ -15,9 +15,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [ // For dark mode support via next-themes
-    { media: '(prefers-color-scheme: light)', color: 'hsl(0 0% 100%)' }, // White (light background)
-    { media: '(prefers-color-scheme: dark)', color: 'hsl(222.2 84% 4.9%)' }, // Dark Grey/Black (dark background)
+  themeColor: [ 
+    { media: '(prefers-color-scheme: light)', color: 'hsl(0 0% 100%)' }, 
+    { media: '(prefers-color-scheme: dark)', color: 'hsl(222.2 84% 4.9%)' }, 
   ],
 };
 
@@ -43,4 +43,3 @@ export default function RootLayout({
     </ClerkProvider>
   );
 }
-

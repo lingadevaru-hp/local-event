@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import type { WatchListNotification } from '@/types/event';
-import { useUser } from '@clerk/nextjs'; // Changed from useAuth
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 
 const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
@@ -24,7 +24,7 @@ const MOCK_NOTIFICATIONS_STORE: WatchListNotification[] = [
     type: 'PRICE_REDUCED', createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), isRead: false
   },
     { 
-    id: 'notif3', userId: 'clerk_user_id_placeholder', eventId: '2', // Example Clerk user ID
+    id: 'notif3', userId: 'clerk_user_id_placeholder', eventId: '2', 
     message: 'Mysuru Dasara Tech Hackathon has new updates!', 
     type: 'LOCATION_UPDATED', createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString(), isRead: true
   },
@@ -35,7 +35,6 @@ let mockNotificationsData = [...MOCK_NOTIFICATIONS_STORE];
 async function fetchNotifications(userId: string): Promise<WatchListNotification[]> {
   console.log('Fetching notifications for user:', userId);
   await new Promise(resolve => setTimeout(resolve, 700));
-  // Filter notifications by Clerk user ID
   return mockNotificationsData.filter(n => n.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
@@ -60,11 +59,11 @@ async function deleteNotification(notificationId: string, userId: string): Promi
 
 
 export default function NotificationsPage() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<WatchListNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // For notifications fetching
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -116,7 +115,7 @@ export default function NotificationsPage() {
     return Math.floor(seconds) + " seconds ago";
   };
 
-  if (!isLoaded || isLoading) { // Show loader if Clerk is loading or notifications are loading
+  if (!isLoaded || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -125,7 +124,7 @@ export default function NotificationsPage() {
     );
   }
   
-  if (isLoaded && !isSignedIn) { // If Clerk loaded and user is not signed in
+  if (isLoaded && !isSignedIn) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Button variant="outline" asChild className="mb-6">

@@ -29,14 +29,15 @@ export default function ProfilePage() {
   const [appUserDetails, setAppUserDetails] = useState<Partial<User> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // For app-specific details loading
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true); 
+
   const { toast } = useToast();
 
   // Form state for app-specific fields
-  const [name, setName] = useState(''); // Clerk provides fullName, this can be for overriding or if not available
+  const [name, setName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | 'Prefer not to say' | ''>('');
   const [dob, setDob] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState(''); // Clerk can manage phone, this could be separate
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [district, setDistrict] = useState<KarnatakaDistrict | ''>('');
   const [city, setCity] = useState<KarnatakaCity | 'Other' | ''>('');
   const [customCity, setCustomCity] = useState('');
@@ -46,32 +47,27 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/profile'); // Clerk handles /sign-in
+      router.push('/sign-in?redirect_url=/profile'); 
       return;
     }
 
     if (isLoaded && isSignedIn && clerkUser) {
       setIsLoadingProfile(true);
-      // Fetch or initialize app-specific details from our mock store
       let userDetails = MOCK_APP_USER_DETAILS[clerkUser.id];
       
       if (!userDetails) {
-        // Initialize with some defaults if not found in mock store
         userDetails = {
-          languagePreference: 'English', // Default
-          // Other fields can be initialized as empty or from Clerk if applicable
+          languagePreference: 'English',
         };
         MOCK_APP_USER_DETAILS[clerkUser.id] = userDetails;
       }
 
       setAppUserDetails(userDetails);
       
-      // Initialize form fields
       setName(clerkUser.fullName || userDetails.name || '');
       setGender(userDetails.gender || '');
       setDob(userDetails.dob || '');
-      // Clerk's phone might be clerkUser.phoneNumbers[0]?.phoneNumber
-      setPhoneNumber(userDetails.phoneNumber || ''); 
+      setPhoneNumber(userDetails.phoneNumber || clerkUser.phoneNumbers?.[0]?.phoneNumber || ''); 
       setDistrict(userDetails.district || '');
       setCity(userDetails.customCity ? 'Other' : (userDetails.city as KarnatakaCity | 'Other' | '') || '');
       setCustomCity(userDetails.customCity || '');
@@ -91,7 +87,7 @@ export default function ProfilePage() {
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appUserDetails || !clerkUser) return;
+    if (!clerkUser) return;
     if (!name || !district || !languagePreference) {
         toast({ title: "Missing Required Fields", description: "Name, District, and Language Preference are required.", variant: "destructive"});
         return;
@@ -104,7 +100,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     
     const updatedAppSpecificData: Partial<User> = {
-      name, // This might update Clerk's name too if desired via Clerk SDK
+      name, 
       gender: gender || undefined,
       dob: dob || undefined,
       phoneNumber: phoneNumber || undefined,
@@ -116,14 +112,21 @@ export default function ProfilePage() {
       interests: interests.length > 0 ? interests : undefined,
     };
 
-    // Simulate saving to backend/mock store
     await new Promise(resolve => setTimeout(resolve, 1000));
     MOCK_APP_USER_DETAILS[clerkUser.id] = { ...MOCK_APP_USER_DETAILS[clerkUser.id], ...updatedAppSpecificData };
     setAppUserDetails(prev => ({...prev, ...updatedAppSpecificData})); 
     
-    // If you want to update Clerk's user attributes (e.g. name, publicMetadata for interests)
-    // you would use clerkUser.update() here.
-    // Example: await clerkUser.update({ fullName: name, publicMetadata: { interests: interests } });
+    try {
+      // Update Clerk's user object if name changed
+      if (clerkUser.fullName !== name) {
+        await clerkUser.update({ fullName: name });
+      }
+      // Optionally update publicMetadata for other app-specific details
+      // await clerkUser.update({ publicMetadata: { interests, district, city: city === 'Other' ? customCity : city } });
+    } catch (error) {
+      console.error("Error updating Clerk user:", error);
+      toast({ title: 'Clerk Update Failed', description: 'Could not save all changes to Clerk.', variant: "destructive" });
+    }
 
     toast({ title: 'Profile Updated!', description: 'Your profile information has been saved.' });
     setIsSaving(false);
@@ -136,7 +139,7 @@ export default function ProfilePage() {
 
   const displayEmail = clerkUser.primaryEmailAddress?.emailAddress || 'No email';
   const displayName = name || clerkUser.fullName || 'User Profile';
-  const displayPhotoUrl = clerkUser.imageUrl || appUserDetails?.photoURL;
+  const displayPhotoUrl = clerkUser.imageUrl; // Use Clerk's image URL
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-8">
@@ -163,7 +166,7 @@ export default function ProfilePage() {
           {isEditing ? (
             <form onSubmit={handleSaveChanges} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label htmlFor="edit-name">Full Name * (App Specific)</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
+                <div><Label htmlFor="edit-name">Full Name *</Label><Input id="edit-name" value={name} onChange={e => setName(e.target.value)} required disabled={isSaving}/></div>
                 <div>
                   <Label htmlFor="edit-gender">Gender</Label>
                   <Select value={gender} onValueChange={v => setGender(v as any)} disabled={isSaving}>
@@ -238,7 +241,8 @@ export default function ProfilePage() {
               <ProfileDetail label="College/Institution" value={collegeOrInstitution} />
               <ProfileDetail label="Interests" value={interests?.join(', ')} />
               <ProfileDetail label="Member Since" value={clerkUser.createdAt ? new Date(clerkUser.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' }) : 'N/A'} />
-              <Button variant="destructive" onClick={() => signOut(() => router.push('/'))} className="w-full mt-6" disabled={isSaving}>
+              <Button variant="link" asChild className="mt-4 text-primary"><Link href="/user">Manage Clerk Account</Link></Button>
+              <Button variant="destructive" onClick={() => signOut(() => router.push('/'))} className="w-full mt-2" disabled={isSaving}>
                 <LogOut className="mr-2 h-4 w-4" /> Log Out
               </Button>
             </div>

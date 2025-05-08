@@ -11,13 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Edit, BarChart2, BellRing, UploadCloud, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import { KARNATAKA_DISTRICTS, EVENT_CATEGORIES, LANGUAGE_PREFERENCES, type KarnatakaDistrict, type EventCategory, type LanguagePreference, type Event } from '@/types/event';
-import { useUser } from '@clerk/nextjs'; // Changed from useAuth
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MOCK_EVENTS_DATA } from '@/lib/mockEvents';
 
 export default function OrganizerDashboardPage() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk's useUser
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
 
   const [eventName, setEventName] = useState('');
@@ -38,13 +38,12 @@ export default function OrganizerDashboardPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [myEvents, setMyEvents] = useState<Event[]>([]);
-  const { toast } } from '@/hooks/use-toast';
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/dashboard'); // Redirect to Clerk's sign-in page
+      router.push('/sign-in?redirect_url=/dashboard');
     } else if (isSignedIn && clerkUser) {
-      // Fetch events created by this clerkUser from MOCK_EVENTS_DATA
       const userEvents = MOCK_EVENTS_DATA.filter(event => event.organizerId === clerkUser.id);
       setMyEvents(userEvents);
     }
@@ -101,7 +100,7 @@ export default function OrganizerDashboardPage() {
     setIsSubmitting(false);
   };
 
-  if (!isLoaded || !isSignedIn) { // Show loader until Clerk status is known or if not signed in
+  if (!isLoaded || !isSignedIn) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

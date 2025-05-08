@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListChecks, Info, Loader2, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useUser from '@clerk/nextjs'; // Changed from useAuth
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { MOCK_EVENTS_DATA from '@/lib/mockEvents'; 
+import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
 
 async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
   console.log('Fetching watchlist for user:', userId);
@@ -33,11 +33,11 @@ async function fetchWatchlistEvents(userId: string): Promise<Event[]> {
 
 
 export default function WatchlistPage() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
 
   const [watchlistEvents, setWatchlistEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // For watchlist data fetching
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

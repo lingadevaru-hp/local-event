@@ -2,7 +2,7 @@
 'use client';
 import type React from 'react'; 
 import { useEffect, useState, use } from 'react'; 
-import type { Event, Rating as RatingType, User as AppUser } from '@/types/event';
+import type { Event, Rating as RatingType } from '@/types/event'; //Removed AppUser as it's covered by Clerk
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { CalendarDays, MapPin, Star, Tag, User as UserIcon, Send, Loader2, Langu
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useUser } from '@clerk/nextjs'; // Changed from useAuth
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MOCK_EVENTS_DATA } from '@/lib/mockEvents'; 
@@ -89,10 +89,10 @@ interface EventPageProps {
 
 export default function EventPage({ params: paramsProp }: EventPageProps) {
   const params = use(paramsProp); 
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser(); // Using Clerk
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // For event data fetching
+  const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   
   const [userRating, setUserRating] = useState(0);
@@ -135,7 +135,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
   const handleRatingSubmit = async () => {
     if (!isSignedIn || !clerkUser) {
       toast({ title: "Login Required", description: "Please log in to submit a review.", variant: "destructive" });
-      router.push(`/sign-in?redirect_url=/events/${params.id}`); // Use Clerk's sign-in
+      router.push(`/sign-in?redirect_url=/events/${params.id}`);
       return;
     }
     if (userRating === 0) {
@@ -201,7 +201,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
     setIsWatchlistLoading(false);
   };
 
-  if (!isLoaded || isLoading) { // Loading if Clerk is not loaded OR event data is loading
+  if (!isLoaded || isLoading) { 
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -275,7 +275,7 @@ export default function EventPage({ params: paramsProp }: EventPageProps) {
               </p>
               {event.descriptionKa && (
                 <div className="mt-4 p-3 bg-secondary/30 rounded-md">
-                    <h3 className="text-lg font-medium text-primary mb-1">ವಿವರಣೆ (Kannada)</h3>
+                    <h3 className="text-lg font-medium text-primary mb-1">Description (Kannada)</h3>
                     <p className="text-foreground leading-relaxed whitespace-pre-line text-base">{event.descriptionKa}</p>
                 </div>
               )}
