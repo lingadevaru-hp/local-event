@@ -12,8 +12,6 @@ import { SpeedInsightsWrapper } from '@/components/speed-insights-wrapper';
 import ErrorBoundary from './error-boundary';
 
 console.log('App initialization started - layout.tsx');
-console.log('Clerk Initialization Attempt - layout.tsx');
-console.log('Environment Variables Loaded At (layout.tsx):', new Date().toISOString());
 
 export const metadata: Metadata = {
   title: 'Local Pulse Karnataka - Discover Events',
@@ -69,37 +67,40 @@ export default function RootLayout({
   let isClerkKeyValid = true;
   let clerkKeyErrorMessage = "";
 
+  console.log('Clerk Publishable Key from env:', clerkPublishableKey);
+
   if (!clerkPublishableKey) {
     isClerkKeyValid = false;
-    clerkKeyErrorMessage = "Clerk Publishable Key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) is MISSING! Please set it in your .env.local file. You can get your key from the Clerk Dashboard: https://dashboard.clerk.com. Application will not work correctly.";
-    console.error("************************** CLERK ERROR **********************************");
-    console.error("Clerk Publishable Key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY):", clerkPublishableKey);
-    console.error(clerkKeyErrorMessage);
-    console.error("******************************************************************************");
+    clerkKeyErrorMessage = "Clerk Publishable Key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) is MISSING! Please set it in your .env.local file. You can get your key from the Clerk Dashboard: https://dashboard.clerk.com.";
   } else {
-    const keyPattern = /^(pk_(test|live)_)(\w+)$/; // Standard Clerk key pattern
-    if (!keyPattern.test(clerkPublishableKey) || clerkPublishableKey.endsWith('$')) {
+    // Basic validation for Clerk key format (pk_test_... or pk_live_...)
+    // A more robust validation regex could be used, but this checks the prefix.
+    // Clerk SDK itself will do the ultimate validation.
+    if (!clerkPublishableKey.startsWith('pk_test_') && !clerkPublishableKey.startsWith('pk_live_')) {
         isClerkKeyValid = false;
-        clerkKeyErrorMessage = `Clerk Publishable Key ("${clerkPublishableKey}") appears INVALID. It should start with 'pk_test_' or 'pk_live_' followed by alphanumeric characters. Keys ending with '$' or other special characters are typically incorrect. Please verify the key in your .env.local file and from the Clerk Dashboard. Application may not work correctly.`;
-        console.error("************************** CLERK ERROR **********************************");
-        console.error(clerkKeyErrorMessage);
-        console.log('Clerk Secret Key (CLERK_SECRET_KEY):', process.env.CLERK_SECRET_KEY ? 'Set (Server-side)' : 'Not Set (Server-side)');
-        console.error("******************************************************************************");
+        clerkKeyErrorMessage = `Clerk Publishable Key ("${clerkPublishableKey}") appears INVALID. It should start with 'pk_test_' or 'pk_live_'. Please verify the key in your .env.local file and from the Clerk Dashboard.`;
+    } else if (clerkPublishableKey.includes('$')) {
+        isClerkKeyValid = false;
+        clerkKeyErrorMessage = `Clerk Publishable Key ("${clerkPublishableKey}") contains a '$' character, which is typically invalid. Please verify the key.`;
     } else {
-        console.log("Clerk Publishable Key seems structurally valid:", clerkPublishableKey);
+        console.log("Clerk Publishable Key seems structurally valid.");
     }
   }
-
+  
   if (!isClerkKeyValid) {
+    console.error("************************** CLERK CONFIGURATION ERROR **********************************");
+    console.error(clerkKeyErrorMessage);
+    console.error("*****************************************************************************************");
     return (
       <html lang="en" className={GeistSans.className} suppressHydrationWarning>
         <head />
         <body className="antialiased flex flex-col min-h-screen bg-red-900 text-white font-sans">
-          <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-red-900 text-white p-8">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-4">Clerk Authentication Error</h1>
+          <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-destructive text-destructive-foreground p-8">
+            <div className="text-center max-w-2xl">
+              <h1 className="text-3xl font-bold mb-4">Application Configuration Error</h1>
               <p className="text-lg mb-2">{clerkKeyErrorMessage}</p>
-              <p>The application cannot initialize correctly. Please check your environment variables in `.env.local` and ensure they are sourced correctly by your development server (you might need to restart it).</p>
+              <p className="text-md">The application cannot initialize correctly due to an issue with the Clerk authentication setup. Please check your environment variables in <code>.env.local</code> and ensure they are sourced correctly by your development server (you might need to restart it).</p>
+              <p className="text-md mt-4">If the problem persists, verify your Clerk API keys on the <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">Clerk Dashboard</a>.</p>
             </div>
           </div>
         </body>
