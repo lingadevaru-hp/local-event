@@ -31,19 +31,19 @@ export const metadata: Metadata = {
     siteName: "Local Pulse Karnataka",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
-    images: [{ url: '/icons/icon-512x512.png' }], 
+    images: [{ url: '/icons/icon-512x512.png' }],
   },
   twitter: {
     card: "summary_large_image",
     title: { default: "Local Pulse Karnataka", template: "%s | Local Pulse KA" },
     description: "Discover local events in Karnataka.",
-    images: ['/icons/icon-512x512.png'], 
+    images: ['/icons/icon-512x512.png'],
   },
   icons: [
-    { rel: "apple-touch-icon", sizes: "180x180", url: "/icons/apple-touch-icon.png" }, 
+    { rel: "apple-touch-icon", sizes: "180x180", url: "/icons/apple-touch-icon.png" },
     { rel: "icon", type: "image/png", sizes: "32x32", url: "/icons/favicon-32x32.png" },
     { rel: "icon", type: "image/png", sizes: "16x16", url: "/icons/favicon-16x16.png" },
-    { rel: "mask-icon", url: "/icons/safari-pinned-tab.svg", color: "#007AFF" }, 
+    { rel: "mask-icon", url: "/icons/safari-pinned-tab.svg", color: "#007AFF" },
   ],
 };
 
@@ -73,9 +73,6 @@ export default function RootLayout({
     isClerkKeyValid = false;
     clerkKeyErrorMessage = "Clerk Publishable Key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) is MISSING! Please set it in your .env.local file. You can get your key from the Clerk Dashboard: https://dashboard.clerk.com.";
   } else {
-    // Basic validation for Clerk key format (pk_test_... or pk_live_...)
-    // A more robust validation regex could be used, but this checks the prefix.
-    // Clerk SDK itself will do the ultimate validation.
     if (!clerkPublishableKey.startsWith('pk_test_') && !clerkPublishableKey.startsWith('pk_live_')) {
         isClerkKeyValid = false;
         clerkKeyErrorMessage = `Clerk Publishable Key ("${clerkPublishableKey}") appears INVALID. It should start with 'pk_test_' or 'pk_live_'. Please verify the key in your .env.local file and from the Clerk Dashboard.`;
@@ -86,7 +83,7 @@ export default function RootLayout({
         console.log("Clerk Publishable Key seems structurally valid.");
     }
   }
-  
+
   if (!isClerkKeyValid) {
     console.error("************************** CLERK CONFIGURATION ERROR **********************************");
     console.error(clerkKeyErrorMessage);
@@ -107,7 +104,7 @@ export default function RootLayout({
       </html>
     );
   }
-  
+
   console.log("Rendering ClerkProvider with key:", clerkPublishableKey ? "*********** (set)" : "MISSING/INVALID");
 
   return (
@@ -120,7 +117,7 @@ export default function RootLayout({
           colorBackground: 'hsl(var(--background))',
           colorInputBackground: 'hsl(var(--input))',
           colorInputText: 'hsl(var(--foreground))',
-          borderRadius: 'var(--radius)', 
+          borderRadius: 'var(--radius)',
         },
         elements: {
           card: 'shadow-xl rounded-2xl border-border bg-card/80 backdrop-blur-md glassmorphism',
@@ -141,7 +138,7 @@ export default function RootLayout({
           <meta name="format-detection" content="telephone=no" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="msapplication-config" content="/icons/browserconfig.xml" />
-          <meta name="msapplication-TileColor" content="#007AFF" /> 
+          <meta name="msapplication-TileColor" content="#007AFF" />
           <meta name="msapplication-tap-highlight" content="no" />
         </head>
         <body className="antialiased flex flex-col min-h-screen bg-background text-foreground font-sans">

@@ -60,10 +60,10 @@ if (missingCriticalVars.length > 0) {
     if (app) {
       auth = getAuth(app);
       console.log("Firebase Auth initialized:", auth ? "OK" : "Failed");
-      
+
       firestore = getFirestore(app);
       console.log("Firebase Firestore initialized:", firestore ? "OK" : "Failed");
-      
+
       if (firestore && typeof window !== 'undefined') {
         enablePersistence(firestore)
           .then(() => console.log("Firebase Firestore persistence enabled."))
@@ -77,7 +77,7 @@ if (missingCriticalVars.length > 0) {
             }
           });
       }
-      
+
       googleAuthProvider = new GoogleAuthProvider();
       console.log("Google Auth Provider initialized:", googleAuthProvider ? "OK" : "Failed");
 

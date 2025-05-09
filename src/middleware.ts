@@ -10,7 +10,7 @@ const isProtectedRoute = createRouteMatcher([
   '/watchlist(.*)',
   // Add other routes here that need to be protected
   // For example, an API route for event submission if it's not a Server Action
-  // '/api/submit-event(.*)' 
+  // '/api/submit-event(.*)'
 ]);
 
 export default clerkMiddleware((auth, req) => {

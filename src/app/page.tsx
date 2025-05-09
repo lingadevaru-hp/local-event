@@ -71,7 +71,7 @@ export default function HomePage() {
         console.log("App came online.");
         setIsOnline(true);
         if (eventError && (eventError.includes("offline") || eventError.includes("network"))) {
-          setEventError(null); 
+          setEventError(null);
           // Optionally re-fetch events
         }
       };
@@ -79,7 +79,7 @@ export default function HomePage() {
         console.log("App went offline.");
         setIsOnline(false);
         setEventError("You are offline. Please check your internet connection to load live event data.");
-        setIsLoadingEvents(false); 
+        setIsLoadingEvents(false);
       };
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
@@ -109,23 +109,23 @@ export default function HomePage() {
     console.log("HomePage: Setting up Firestore listener for recent events...");
 
     const eventsCollectionRef = collection(firestore, 'events');
-    const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(3)); 
+    const q = query(eventsCollectionRef, orderBy('createdAt', 'desc'), limit(3));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       console.log("HomePage: Recent events snapshot received:", querySnapshot.size, "documents");
       const eventsData: EventType[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        eventsData.push({ 
-          ...data, 
-          id: doc.id, 
+        eventsData.push({
+          ...data,
+          id: doc.id,
           date: (data.date as Timestamp)?.toDate?.().toISOString().split('T')[0] || data.date as string,
           endDate: (data.endDate as Timestamp)?.toDate?.().toISOString().split('T')[0] || data.endDate as string | undefined,
           createdAt: (data.createdAt as Timestamp)?.toDate?.().toISOString() || data.createdAt as string,
         } as EventType);
       });
       setRecentEvents(eventsData);
-      setEventError(null); 
+      setEventError(null);
       setIsLoadingEvents(false);
       console.log("HomePage: Recent events updated, loading finished.");
     }, (error) => {
@@ -142,15 +142,15 @@ export default function HomePage() {
         }
         setIsLoadingEvents(false);
       }
-    }, 15000); 
+    }, 15000);
 
     return () => {
       console.log("HomePage: Unsubscribing from recent events snapshot.");
       unsubscribe();
       clearTimeout(loadTimer);
     };
-  }, [isOnline]); 
-  
+  }, [isOnline]);
+
   const renderHeroSection = () => (
     <section className="w-full py-16 md:py-24 text-center relative overflow-hidden bg-card/50 glassmorphism-light dark:glassmorphism-dark rounded-xl shadow-xl mb-10">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-30 mix-blend-multiply dark:opacity-50"></div>
@@ -171,22 +171,22 @@ export default function HomePage() {
             }
         </motion.p>
         {!isSignedIn && isClerkLoaded && (
-            <motion.div 
+            <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
             initial="hidden" animate="visible" variants={buttonVariants}
             >
             <SignInButton mode="modal">
-                <Button 
-                size="lg" 
+                <Button
+                size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl py-3 px-8 text-md shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95 animate-pulse"
                 >
                 <LogIn className="mr-2 h-5 w-5" /> Sign In
                 </Button>
             </SignInButton>
             <SignUpButton mode="modal">
-                <Button 
-                variant="outline" 
-                size="lg" 
+                <Button
+                variant="outline"
+                size="lg"
                 className="text-primary border-primary hover:bg-primary/10 rounded-xl py-3 px-8 text-md shadow-md hover:shadow-lg transition-all duration-300 ease-out transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-primary/40 active:scale-95"
                 >
                 <UserPlus className="mr-2 h-5 w-5" /> Sign Up
@@ -213,7 +213,7 @@ export default function HomePage() {
 
       <div className="container mx-auto px-0 sm:px-4 mt-10 w-full">
         <FeaturedEventsCarousel />
-        
+
         <section className="my-12">
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center md:text-left text-primary tracking-tight">
             Recent Events
